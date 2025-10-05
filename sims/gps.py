@@ -4,9 +4,8 @@ import time
 import uuid
 
 from oshconnect import OSHConnect, Node, System, Datastream
-from oshconnect.datamodels.api_utils import URI, UCUMCode
-from oshconnect.datamodels.swe_components import TimeSchema, VectorSchema, QuantitySchema
-from oshconnect.osh_connect_datamodels import DataRecordSchema
+from oshconnect.api_utils import URI, UCUMCode
+from oshconnect.swe_components import TimeSchema, VectorSchema, QuantitySchema, DataRecordSchema
 from oshconnect.timemanagement import TimeInstant
 from pydantic.v1.utils import to_lower_camel
 
@@ -37,10 +36,10 @@ class GPSSim:
 
     def insert(self):
         if self.system is None:
-            self.system = System(name=to_lower_camel(self.name), label=self.name, urn=f"urn:OCSASim:GPS:111")
+            self.system = System(name=to_lower_camel(self.name), label=self.name, urn=f"urn:OCSASim:GPS:111", parent_node=self.node)
             # self.system = System(name=to_lower_camel(self.name), label=self.name, urn=f"urn:OCSASim:GPS:{self._uuid}")
 
-        self.app.add_system(self.system, self.node, True)
+        self.node.add_system(self.system, self.node, True)
         datastream_schema = DataRecordSchema(label="GPS Simulated Location",
                                              description="GPS Simulated Location",
                                              definition="http://sensorml.com/ont/swe/property/Position", fields=[])
