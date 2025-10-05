@@ -1,0 +1,11 @@
+[project]
+name = "OCASim"
+version = "0.1.0"
+authors = [
+    {name="Ian Patterson", email = "ian@botts-inc.com"}
+]
+requires-python = ">=3.12"
+dependencies = [
+    "oshconnect>=0.3.0a3.post2",
+    "requests"
+]
