@@ -4,25 +4,25 @@ import websockets
 from multiprocessing import Process
 
 from sims.gps import GPSSim
+from sims.controllable_counter_sim import ControllableCounterSim
 
 
-def main():
-    osh = OSHConnect("GPSDriverConnect")
-    local_node = Node("http", "localhost", 8282, "admin", "admin")
+async def main():
+    osh = OSHConnect("TESTConnect")
+    local_node = Node("http", "localhost", 8282, "admin", "admin", enable_mqtt=True)
     osh.add_node(local_node)
 
-    gps_sim = GPSSim("Sim GPS", osh, local_node)
-    gps_sim.insert()
+    # gps_sim = GPSSim("Sim GPS", osh, local_node)
+    # gps_sim.insert()
+    #
+    # gps_sim.start()
 
-    process_1 = gps_sim.start()
+    counter_sim = ControllableCounterSim("ControllableCounter", osh, local_node)
+    counter_sim.insert()
+    counter_sim.start()
 
-    # Start websocket test in a separate process
-    ws_process = Process(target=run_websocket_test)
-
-    process_1.start()
-    ws_process.start()
-    # Optionally, join if you want to wait for it to finish
-    # ws_process.join()
+    while True:
+        await asyncio.sleep(1)
 
 
 def run_websocket_test():
@@ -44,4 +44,5 @@ async def test_websocket():
 
 
 if __name__ == "__main__":
-    main()
+    # main(
+    asyncio.run(main())

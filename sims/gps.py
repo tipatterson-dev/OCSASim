@@ -1,3 +1,4 @@
+import asyncio
 import math
 import multiprocessing
 import time
@@ -5,6 +6,7 @@ import uuid
 
 from oshconnect import OSHConnect, Node, System, Datastream
 from oshconnect.api_utils import URI, UCUMCode
+from oshconnect.streamableresource import StreamableModes
 from oshconnect.swe_components import TimeSchema, VectorSchema, QuantitySchema, DataRecordSchema
 from oshconnect.timemanagement import TimeInstant
 from pydantic.v1.utils import to_lower_camel
@@ -68,6 +70,7 @@ class GPSSim:
         datastream_schema.fields.append(orientation)
 
         self.datastream = self.system.add_insert_datastream(datastream_schema)
+        self.datastream.set_connection_mode(StreamableModes.PUSH)
 
         if self.datastream is None:
             return False
@@ -80,15 +83,21 @@ class GPSSim:
         :return:
         """
         self.should_simulate = True
+        # self.datastream.initialize()
+        self.datastream.initialize()
+        self.datastream.start()
+        task2 = asyncio.create_task(self.simulation())
 
-        return multiprocessing.Process(target=self.simulation(), args=(self,))
+        # return multiprocessing.Process(target=self.simulation(), args=(self,))
 
     def stop(self):
         self.should_simulate = False
+        self.datastream.stop()
 
-    def simulation(self):
+    async def simulation(self):
         print("Starting inner GPS simulation process")
         while self.should_simulate:
+            print("Simulating GPS data...")
             timeinstant = TimeInstant.now_as_time_instant()
             timedata = timeinstant.get_iso_time()
             # Calculate point on circle
@@ -111,5 +120,8 @@ class GPSSim:
                 }
             }
 
-            self.datastream.insert_observation_dict(gps_sim_data)
-            time.sleep(2)  # Wait 2 seconds before next iteration
+            # self.datastream.insert_observation_dict(gps_sim_data)
+            # self.datastream.insert_data(gps_sim_data)
+            self.datastream.insert(gps_sim_data)
+            # self.datastream.insert_data(gps_sim_data)
+            time.sleep(0.5)  # Wait 2 seconds before next iteration

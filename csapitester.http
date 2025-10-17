@@ -1,0 +1,93 @@
+### GET request to example server
+GET https://examples.http-client.intellij.net/get
+    ?generated-in=PyCharm
+
+###
+
+POST http://localhost:8282/sensorhub/api/systems/027eljmqhd40/controlstreams
+Content-Type: application/json
+Authorization: Basic YWRtaW46YWRtaW4=
+
+{
+  "name": "Controllable Counter Control",
+  "validTime": [
+    "2025-10-14T15:29:40.574235Z",
+    "2026-10-14T15:29:40.000000Z"
+  ],
+  "inputName": "controllablecountercontrol",
+  "async": true,
+  "schema": {
+    "commandFormat": "application/json",
+    "parameterSchema": {
+      "type": "DataRecord",
+      "label": "Controllable Counter Control",
+      "description": "Control stream for the controllable counter simulation",
+      "updatable": false,
+      "optional": false,
+      "definition": "http://bottsinc.com/def/ControllableCounterControl",
+      "fields": [
+        {
+          "type": "Boolean",
+          "label": "Set Count Down",
+          "updatable": false,
+          "optional": false,
+          "definition": "http://bottsinc.com/def/SetCountDown",
+          "name": "setCountDown"
+        },
+        {
+          "type": "Count",
+          "label": "Set Step",
+          "updatable": false,
+          "optional": false,
+          "definition": "http://bottsinc.com/def/SetStep",
+          "name": "setStep"
+        },
+        {
+          "type": "Count",
+          "label": "Set Lower Bound",
+          "updatable": false,
+          "optional": false,
+          "definition": "http://bottsinc.com/def/SetLowerBound",
+          "name": "setLowerBound"
+        },
+        {
+          "type": "Count",
+          "label": "Set Upper Bound",
+          "updatable": false,
+          "optional": false,
+          "definition": "http://bottsinc.com/def/SetUpperBound",
+          "name": "setUpperBound"
+        }
+      ]
+    }
+  }
+}
+
+###
+
+POST http://localhost:8282/sensorhub/api/controlstreams/02n8r9ncgpcg/commands
+Content-Type: application/json
+Authorization: Basic YWRtaW46YWRtaW4=
+
+{
+  "params": {
+    "setCountDown": true,
+    "setStep": 5,
+    "setLowerBound": 0,
+    "setUpperBound": 100
+  }
+}
+
+###
+POST http://localhost:8282/sensorhub/api/controlstreams/02n8r9ncgpcg/commands
+Content-Type: application/json
+Authorization: Basic YWRtaW46YWRtaW4=
+
+{
+  "params": {
+    "setCountDown": false,
+    "setStep": 1,
+    "setLowerBound": 0,
+    "setUpperBound": 100
+  }
+}
