@@ -6,6 +6,6 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
-    "oshconnect>=0.3.0a3.post2",
+    "oshconnect>=0.3.0a5",
     "requests"
 ]

@@ -68,7 +68,7 @@ class ControllableCounterSim(Sim):
             [set_count_down_schema, set_step_schema, set_lower_bound_schema, set_upper_bound_schema])
 
     def insert(self, system: System = None, datastream_schema: DataRecordSchema = None,
-               ControlStream: DataRecordSchema = None):
+               controlstream: DataRecordSchema = None):
         """
         Inserts the default system and datastream into the node. Ignores the params from the super class for this sim.
         :param system:
