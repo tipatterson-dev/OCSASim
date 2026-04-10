@@ -5,21 +5,29 @@ from multiprocessing import Process
 
 from sims.gps import GPSSim
 from sims.controllable_counter_sim import ControllableCounterSim
+from sims.lineofbearing import LoBSim
 
 
 async def main():
     osh = OSHConnect("TESTConnect")
-    local_node = Node("http", "localhost", 8282, "admin", "admin", enable_mqtt=True)
+    local_node = Node("http", "192.168.1.64", 8282, "admin", "admin", enable_mqtt=True)
     osh.add_node(local_node)
 
-    # gps_sim = GPSSim("Sim GPS", osh, local_node)
-    # gps_sim.insert()
-    #
-    # gps_sim.start()
+    osh.discover_systems()
+    osh.discover_datastreams()
+    # osh.discover_controlstreams()
+
+    osh.save_config()
+
+    print("saved data!")
 
     counter_sim = ControllableCounterSim("ControllableCounter", osh, local_node)
     counter_sim.insert()
     counter_sim.start()
+
+    # lob_sim = LoBSim("LoBSim", osh, local_node)
+    # lob_sim.insert()
+    # lob_sim.start()
 
     while True:
         await asyncio.sleep(1)

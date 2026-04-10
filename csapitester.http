@@ -65,7 +65,7 @@ Authorization: Basic YWRtaW46YWRtaW4=
 
 ###
 
-POST http://localhost:8282/sensorhub/api/controlstreams/02n8r9ncgpcg/commands
+POST http://localhost:8282/sensorhub/api/controlstreams/027eljmqhd40/commands
 Content-Type: application/json
 Authorization: Basic YWRtaW46YWRtaW4=
 
@@ -79,7 +79,7 @@ Authorization: Basic YWRtaW46YWRtaW4=
 }
 
 ###
-POST http://localhost:8282/sensorhub/api/controlstreams/02n8r9ncgpcg/commands
+POST http://localhost:8282/sensorhub/api/controlstreams/027eljmqhd40/commands
 Content-Type: application/json
 Authorization: Basic YWRtaW46YWRtaW4=
 
@@ -91,3 +91,7 @@ Authorization: Basic YWRtaW46YWRtaW4=
     "setUpperBound": 100
   }
 }
+
+###
+GET http://localhost:8282/sensorhub/api/systems
+Authorization: Basic YWRtaW46YWRtaW4=
