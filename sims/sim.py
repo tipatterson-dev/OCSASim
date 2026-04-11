@@ -37,7 +37,8 @@ class Sim(ABC):
         Inserts the included system and datastream into the node.
         :return:
         """
-        self.node.add_system(system, self.node, True)
+        self.system = system
+        self.node.add_system(system, True)
         self.datastream = self.system.add_insert_datastream(datastream_schema)
         self.datastream.set_connection_mode(StreamableModes.BIDIRECTIONAL)
 

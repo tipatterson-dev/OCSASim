@@ -11,7 +11,9 @@ from oshconnect.api_utils import URI
 from oshconnect.csapi4py.constants import APIResourceTypes
 from oshconnect.swe_components import DataRecordSchema, TimeSchema, CountSchema, BooleanSchema
 from oshconnect.timemanagement import TimeInstant
-from pydantic.v1.utils import to_lower_camel
+def to_lower_camel(s: str) -> str:
+    parts = s.split('_')
+    return parts[0] + ''.join(p.title() for p in parts[1:])
 
 from sims.sim import Sim
 
@@ -78,7 +80,7 @@ class ControllableCounterSim(Sim):
         """
         self.system = System(name=to_lower_camel(self.name), label=self.name,
                              urn=f"urn:OCSASim:ControllableCounter:{self.name}", parent_node=self.node)
-        self.node.add_system(self.system, self.node, True)
+        self.node.add_system(self.system, True)
 
         self.datastream = self.system.add_insert_datastream(self.ds_schema)
         self.controlstream = self.system.add_and_insert_control_stream(self.controlstream_schema)
@@ -104,7 +106,7 @@ class ControllableCounterSim(Sim):
         counter_t.join()
 
     def count_func(self):
-        while True:
+        while self.should_simulate:
             self.count += self.step * self.step_sign
             match self.step_sign:
                 case 1:

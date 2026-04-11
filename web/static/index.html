@@ -1,0 +1,1023 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OCSASim</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #0f1117;
+    color: #e2e8f0;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto 1fr;
+    height: 100vh;
+    overflow: hidden;
+    gap: 0;
+  }
+
+  header {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 24px;
+    background: #161b27;
+    border-bottom: 1px solid #2d3748;
+  }
+  header h1 { font-size: 1.1rem; font-weight: 600; letter-spacing: 0.03em; }
+
+  #ws-indicator {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8rem;
+    color: #94a3b8;
+  }
+  #ws-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #ef4444;
+    transition: background 0.3s;
+  }
+  #ws-dot.connected { background: #22c55e; }
+
+  /* ── Add Node Bar ──────────────────────────────────────────────────── */
+  #node-bar {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding: 12px 24px;
+    background: #161b27;
+    border-bottom: 1px solid #2d3748;
+  }
+  #node-bar .field-group { display: flex; flex-direction: column; gap: 4px; }
+  #node-bar label { font-size: 0.7rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; }
+  #node-bar input, #node-bar select {
+    background: #0f1117;
+    border: 1px solid #374151;
+    border-radius: 5px;
+    color: #e2e8f0;
+    padding: 5px 8px;
+    font-size: 0.85rem;
+    height: 32px;
+  }
+  #node-bar input[type="password"] { width: 110px; }
+  #node-bar input[type="text"]     { width: 140px; }
+  #node-bar input[type="text"].narrow { width: 90px; }
+  #node-bar input[type="number"]   { width: 80px; }
+  #node-bar select                 { width: 80px; }
+
+  #connect-error {
+    color: #f87171;
+    font-size: 0.75rem;
+    align-self: flex-end;
+    padding-bottom: 6px;
+    display: none;
+  }
+
+  /* ── Panels ────────────────────────────────────────────────────────── */
+  .panel {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 20px 24px 0;
+    border-right: 1px solid #2d3748;
+  }
+  .panel:last-child { border-right: none; }
+
+  .panel-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #64748b;
+    margin-bottom: 16px;
+    flex-shrink: 0;
+  }
+
+  #sims-panel  { padding-bottom: 0; }
+  #node-list   { flex: 1; overflow-y: auto; padding-bottom: 16px; }
+  #feed-panel  { padding-bottom: 0; }
+  #feed-scroll { flex: 1; overflow-y: auto; padding-bottom: 16px; }
+
+  /* ── Node cards ────────────────────────────────────────────────────── */
+  .node-card {
+    background: #161b27;
+    border: 1px solid #2d3748;
+    border-radius: 8px;
+    margin-bottom: 16px;
+    overflow: hidden;
+  }
+
+  .node-card-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 14px;
+    background: #1a2030;
+    border-bottom: 1px solid #2d3748;
+  }
+
+  .node-status-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: #ef4444;
+    flex-shrink: 0;
+    transition: background 0.3s;
+  }
+  .node-status-dot.connected { background: #22c55e; }
+
+  .node-label {
+    font-weight: 600;
+    font-size: 0.88rem;
+    flex: 1;
+  }
+
+  .node-id-badge {
+    font-size: 0.62rem;
+    color: #374151;
+    font-family: "Fira Code", monospace;
+    background: #0f1117;
+    border: 1px solid #2d3748;
+    border-radius: 4px;
+    padding: 1px 5px;
+  }
+
+  .btn-disconnect {
+    background: transparent;
+    border: 1px solid #374151;
+    color: #6b7280;
+    padding: 2px 10px;
+    font-size: 0.7rem;
+    border-radius: 4px;
+  }
+  .btn-disconnect:hover:not(:disabled) {
+    background: #2d3748;
+    color: #e2e8f0;
+    opacity: 1;
+  }
+
+  .node-body { padding: 12px 14px 0; }
+
+  /* ── Sim cards ─────────────────────────────────────────────────────── */
+  .sim-card {
+    background: #1e2535;
+    border: 1px solid #2d3748;
+    border-radius: 8px;
+    padding: 14px;
+    margin-bottom: 10px;
+  }
+  .sim-card:last-child { margin-bottom: 14px; }
+
+  .sim-card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .sim-name { font-weight: 600; font-size: 0.95rem; }
+  .sim-type { font-size: 0.72rem; color: #64748b; margin-left: auto; }
+
+  .status-badge {
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: #374151;
+    color: #9ca3af;
+  }
+  .status-badge.running { background: #14532d; color: #4ade80; }
+
+  .params-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .param-item {
+    background: #0f1117;
+    border: 1px solid #2d3748;
+    border-radius: 6px;
+    padding: 6px 10px;
+  }
+  .param-label { font-size: 0.68rem; color: #64748b; }
+  .param-value { font-size: 0.9rem; font-weight: 500; font-family: monospace; }
+
+  .btn-row { display: flex; gap: 8px; margin-bottom: 10px; }
+
+  button {
+    padding: 6px 14px;
+    border-radius: 6px;
+    border: none;
+    font-size: 0.82rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  button:disabled { opacity: 0.4; cursor: default; }
+  button:hover:not(:disabled) { opacity: 0.85; }
+
+  .btn-start    { background: #16a34a; color: #fff; }
+  .btn-stop     { background: #dc2626; color: #fff; }
+  .btn-send     { background: #2563eb; color: #fff; }
+  .btn-connect     { background: #7c3aed; color: #fff; height: 32px; padding: 0 16px; }
+  .btn-clear-store { background: transparent; border: 1px solid #4b5563; color: #6b7280; height: 32px; padding: 0 12px; font-size: 0.78rem; }
+  .btn-clear-store:hover:not(:disabled) { background: #1e2535; color: #e2e8f0; opacity: 1; }
+
+  /* ── Collapsible sections ──────────────────────────────────────────── */
+  .collapsible { border-top: 1px solid #2d3748; margin-top: 4px; }
+  /* First collapsible in a node body — no top border */
+  .node-body > .collapsible:first-child { border-top: none; margin-top: 0; }
+
+  .collapsible-header {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+    padding: 8px 0 6px;
+    user-select: none;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    transition: color 0.15s;
+  }
+  .collapsible-header:hover { color: #94a3b8; }
+
+  .chevron {
+    display: inline-block;
+    font-style: normal;
+    font-size: 0.6rem;
+    color: #4b5563;
+    transition: transform 0.2s;
+    line-height: 1;
+  }
+  .collapsible.open .chevron { transform: rotate(90deg); }
+
+  .collapsible-body { display: none; padding-bottom: 4px; }
+  .collapsible.open .collapsible-body { display: block; }
+
+  /* ── Topic rows ────────────────────────────────────────────────────── */
+  .topic-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+  .topic-label {
+    font-size: 0.72rem;
+    color: #94a3b8;
+    min-width: 100px;
+    flex-shrink: 0;
+  }
+  /* Color dot — background set inline per topic */
+  .topic-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .topic-string {
+    font-family: "Fira Code", "Cascadia Code", monospace;
+    font-size: 0.67rem;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    /* color set inline per topic */
+  }
+
+  /* Toggle switch */
+  .toggle { position: relative; display: inline-block; width: 34px; height: 18px; flex-shrink: 0; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider {
+    position: absolute; inset: 0;
+    background: #374151;
+    border-radius: 18px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .toggle-slider::before {
+    content: '';
+    position: absolute;
+    width: 12px; height: 12px;
+    left: 3px; top: 3px;
+    background: #94a3b8;
+    border-radius: 50%;
+    transition: transform 0.2s, background 0.2s;
+  }
+  .toggle input:checked + .toggle-slider { background: #1d4ed8; }
+  .toggle input:checked + .toggle-slider::before { transform: translateX(16px); background: #fff; }
+
+  /* Command form */
+  .command-form { border-top: 1px solid #2d3748; padding-top: 12px; }
+  .command-form-title {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 8px;
+  }
+
+  .field-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .field-group { display: flex; flex-direction: column; gap: 4px; }
+  .field-group label { font-size: 0.72rem; color: #94a3b8; }
+
+  input[type="number"] {
+    background: #0f1117;
+    border: 1px solid #374151;
+    border-radius: 5px;
+    color: #e2e8f0;
+    padding: 5px 8px;
+    font-size: 0.85rem;
+    width: 100%;
+  }
+
+  .checkbox-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .checkbox-row label { font-size: 0.82rem; color: #94a3b8; }
+
+  #no-node-msg { color: #4b5563; font-size: 0.85rem; font-style: italic; }
+
+  /* ── MQTT feed panel ───────────────────────────────────────────────── */
+  #feed-header { flex-shrink: 0; }
+  #feed-controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 10px;
+    flex-shrink: 0;
+  }
+
+  .btn-secondary {
+    background: #1e2535;
+    color: #94a3b8;
+    border: 1px solid #2d3748;
+    padding: 4px 12px;
+    font-size: 0.78rem;
+  }
+
+  #feed {
+    font-family: "Fira Code", "Cascadia Code", monospace;
+    font-size: 0.75rem;
+    line-height: 1.6;
+  }
+
+  .feed-item {
+    padding: 6px 10px;
+    border-radius: 5px;
+    margin-bottom: 4px;
+    background: #1e2535;
+    border-left: 3px solid #3b82f6; /* default; overridden inline */
+    word-break: break-all;
+  }
+
+  .feed-meta {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 2px;
+    flex-wrap: wrap;
+  }
+  /* color set inline per topic */
+  .feed-topic { font-weight: 600; }
+  .feed-node-tag {
+    font-size: 0.62rem;
+    color: #4b5563;
+    background: #0f1117;
+    border: 1px solid #2d3748;
+    border-radius: 3px;
+    padding: 0 4px;
+    font-family: monospace;
+  }
+  .feed-payload { color: #94a3b8; white-space: pre-wrap; }
+  .feed-time    { color: #4b5563; font-size: 0.68rem; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>OCSASim</h1>
+  <a href="/builder" style="font-size:0.82rem;color:#7c3aed;text-decoration:none;padding:4px 10px;border:1px solid #4c1d95;border-radius:5px;">&#9881; Builder</a>
+  <div id="ws-indicator">
+    <span id="ws-dot"></span>
+    <span id="ws-label">Disconnected</span>
+  </div>
+</header>
+
+<!-- Add Node Bar -->
+<div id="node-bar">
+  <div class="field-group">
+    <label>Protocol</label>
+    <select id="cfg-protocol">
+      <option value="http">http</option>
+      <option value="https">https</option>
+    </select>
+  </div>
+  <div class="field-group">
+    <label>Host</label>
+    <input type="text" id="cfg-host" placeholder="192.168.1.64">
+  </div>
+  <div class="field-group">
+    <label>Port</label>
+    <input type="number" id="cfg-port" value="8282">
+  </div>
+  <div class="field-group">
+    <label>Username</label>
+    <input type="text" id="cfg-username" value="admin">
+  </div>
+  <div class="field-group">
+    <label>Password</label>
+    <input type="password" id="cfg-password" value="admin">
+  </div>
+  <div class="field-group">
+    <label>API Root</label>
+    <input type="text" class="narrow" id="cfg-api-root" value="api">
+  </div>
+  <div class="field-group">
+    <label>MQTT Root</label>
+    <input type="text" class="narrow" id="cfg-mqtt-root" value="oshex">
+  </div>
+  <div class="field-group" style="justify-content:flex-end;padding-bottom:5px;">
+    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:0.75rem;color:#64748b;">
+      <input type="checkbox" id="cfg-use-datastore" checked style="width:14px;height:14px;cursor:pointer;">
+      Use Datastore
+    </label>
+  </div>
+  <button class="btn-connect" id="btn-connect" onclick="connectNode()">+ Add Node</button>
+  <button class="btn-clear-store" id="btn-clear-store" onclick="clearDatastore()" title="Delete all saved resources from the local datastore">Clear Store</button>
+  <span id="connect-error"></span>
+</div>
+
+<!-- Nodes & Simulations Panel -->
+<div class="panel" id="sims-panel">
+  <div class="panel-title">Nodes &amp; Simulations</div>
+  <div id="node-list">
+    <span id="no-node-msg">Add a node above to start simulations.</span>
+  </div>
+</div>
+
+<!-- MQTT Feed Panel -->
+<div class="panel" id="feed-panel">
+  <div id="feed-header">
+    <div class="panel-title">MQTT Feed</div>
+    <div id="feed-controls">
+      <button class="btn-secondary" id="btn-pause">Pause</button>
+      <button class="btn-secondary" id="btn-clear">Clear</button>
+      <span id="msg-count" style="font-size:0.75rem;color:#4b5563;">0 messages</span>
+    </div>
+  </div>
+  <div id="feed-scroll">
+    <div id="feed"></div>
+  </div>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────
+let paused = false;
+let msgCount = 0;
+const MAX_FEED_ITEMS = 200;
+
+// node_id → { state, sims }
+const _nodes = new Map();
+// node_id → Set<topic>
+const _subscriptions = new Map();
+
+// ── Color coding ───────────────────────────────────────────────────────
+function topicHue(topic) {
+  // djb2-variant hash → consistent hue per topic string
+  let h = 5381;
+  for (let i = 0; i < topic.length; i++) {
+    h = ((h << 5) + h) ^ topic.charCodeAt(i);
+    h = h >>> 0; // keep unsigned
+  }
+  return h % 360;
+}
+function topicColor(topic) {
+  return `hsl(${topicHue(topic)}, 65%, 58%)`;
+}
+
+// ── Collapsible helper ─────────────────────────────────────────────────
+function toggleCollapsible(id) {
+  document.getElementById(id).classList.toggle('open');
+}
+
+// ── WebSocket (MQTT feed) ──────────────────────────────────────────────
+function connectWS() {
+  const ws = new WebSocket(`ws://${location.host}/ws/mqtt`);
+  const dot   = document.getElementById('ws-dot');
+  const label = document.getElementById('ws-label');
+
+  ws.onopen  = () => { dot.classList.add('connected');    label.textContent = 'Connected';     };
+  ws.onclose = () => { dot.classList.remove('connected'); label.textContent = 'Reconnecting…'; setTimeout(connectWS, 3000); };
+  ws.onmessage = (e) => { if (!paused) appendFeedItem(JSON.parse(e.data)); };
+}
+
+function appendFeedItem({ node_id, topic, payload }) {
+  const color = topicColor(topic);
+  const item  = document.createElement('div');
+  item.className = 'feed-item';
+  item.style.borderLeftColor = color;
+
+  let pretty = payload;
+  try { pretty = JSON.stringify(JSON.parse(payload), null, 2); } catch {}
+
+  const time    = new Date().toLocaleTimeString();
+  const nodeTag = node_id ? `<span class="feed-node-tag">${escHtml(node_id)}</span>` : '';
+
+  item.innerHTML =
+    `<div class="feed-meta">` +
+      `<span class="feed-topic" style="color:${color}">${escHtml(topic)}</span>` +
+      nodeTag +
+    `</div>` +
+    `<div class="feed-payload">${escHtml(pretty)}</div>` +
+    `<div class="feed-time">${time}</div>`;
+
+  const feed = document.getElementById('feed');
+  feed.prepend(item);
+  msgCount++;
+  document.getElementById('msg-count').textContent = `${msgCount} messages`;
+  while (feed.children.length > MAX_FEED_ITEMS) feed.removeChild(feed.lastChild);
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+document.getElementById('btn-pause').addEventListener('click', () => {
+  paused = !paused;
+  document.getElementById('btn-pause').textContent = paused ? 'Resume' : 'Pause';
+});
+document.getElementById('btn-clear').addEventListener('click', () => {
+  document.getElementById('feed').innerHTML = '';
+  msgCount = 0;
+  document.getElementById('msg-count').textContent = '0 messages';
+});
+
+// ── Subscription management ────────────────────────────────────────────
+async function loadSubscriptions(nodeId) {
+  const res = await fetch(`/api/mqtt/${nodeId}/subscriptions`);
+  const data = await res.json();
+  _subscriptions.set(nodeId, new Set(data.subscriptions));
+}
+
+async function mqttToggle(nodeId, input) {
+  const topic = input.dataset.topic;
+  if (!_subscriptions.has(nodeId)) _subscriptions.set(nodeId, new Set());
+  if (input.checked) {
+    _subscriptions.get(nodeId).add(topic);
+    await fetch(`/api/mqtt/${nodeId}/subscribe`, {
+      method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({topic}),
+    });
+  } else {
+    _subscriptions.get(nodeId).delete(topic);
+    await fetch(`/api/mqtt/${nodeId}/unsubscribe`, {
+      method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({topic}),
+    });
+  }
+}
+
+// ── Node Connection ────────────────────────────────────────────────────
+async function connectNode() {
+  const btn   = document.getElementById('btn-connect');
+  const errEl = document.getElementById('connect-error');
+  errEl.style.display = 'none';
+  btn.disabled = true;
+  btn.textContent = 'Connecting…';
+
+  const cfg = {
+    protocol:        document.getElementById('cfg-protocol').value,
+    host:            document.getElementById('cfg-host').value.trim(),
+    port:            parseInt(document.getElementById('cfg-port').value),
+    username:        document.getElementById('cfg-username').value,
+    password:        document.getElementById('cfg-password').value,
+    api_root:        document.getElementById('cfg-api-root').value.trim(),
+    mqtt_topic_root: document.getElementById('cfg-mqtt-root').value.trim(),
+    use_datastore:   document.getElementById('cfg-use-datastore').checked,
+  };
+
+  try {
+    const res = await fetch('/api/nodes/connect', {
+      method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(cfg),
+    });
+    if (res.ok) {
+      const { node_id } = await res.json();
+      await loadSubscriptions(node_id);
+      const simsRes = await fetch(`/api/nodes/${node_id}/sims`);
+      const sims = await simsRes.json();
+      const state = { ...cfg, node_id, connected: true };
+      _nodes.set(node_id, { state, sims });
+
+      const placeholder = document.getElementById('no-node-msg');
+      if (placeholder) placeholder.remove();
+      document.getElementById('node-list').appendChild(buildNodeCard(node_id, state, sims));
+    } else {
+      const detail = (await res.json()).detail || 'Connection failed';
+      errEl.textContent = detail;
+      errEl.style.display = 'block';
+    }
+  } catch (e) {
+    errEl.textContent = String(e);
+    errEl.style.display = 'block';
+  }
+
+  btn.disabled = false;
+  btn.textContent = '+ Add Node';
+}
+
+async function disconnectNode(nodeId) {
+  const res = await fetch(`/api/nodes/${nodeId}`, { method: 'DELETE' });
+  if (res.ok) {
+    _nodes.delete(nodeId);
+    _subscriptions.delete(nodeId);
+    const card = document.getElementById(`node-card-${nodeId}`);
+    if (card) card.remove();
+    if (!document.getElementById('node-list').children.length) {
+      document.getElementById('node-list').innerHTML =
+        '<span id="no-node-msg">Add a node above to start simulations.</span>';
+    }
+  }
+}
+
+async function clearDatastore() {
+  const btn = document.getElementById('btn-clear-store');
+  btn.disabled = true;
+  btn.textContent = 'Clearing…';
+  try {
+    await fetch('/api/datastore', { method: 'DELETE' });
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Clear Store';
+  }
+}
+
+// ── Node Card Builder ──────────────────────────────────────────────────
+const GLOBAL_TOPIC_DEFS = [
+  { label: 'All Systems',        suffix: 'systems/#'        },
+  { label: 'All Datastreams',    suffix: 'datastreams/#'    },
+  { label: 'All ControlStreams', suffix: 'controlstreams/#' },
+];
+
+function buildNodeCard(nodeId, state, sims) {
+  const card = document.createElement('div');
+  card.className = 'node-card';
+  card.id = `node-card-${nodeId}`;
+
+  // Header
+  const hdr = document.createElement('div');
+  hdr.className = 'node-card-header';
+  hdr.innerHTML =
+    `<span class="node-status-dot connected"></span>` +
+    `<span class="node-label">${escHtml(state.host)}:${escHtml(String(state.port))}</span>` +
+    `<span class="node-id-badge">${escHtml(nodeId)}</span>` +
+    `<button class="btn-disconnect" onclick="disconnectNode('${nodeId}')">Disconnect</button>`;
+  card.appendChild(hdr);
+
+  // Body
+  const body = document.createElement('div');
+  body.className = 'node-body';
+
+  // Global wildcard topic toggles (per-node, since each node has its own MQTT broker)
+  body.appendChild(buildNodeWildcards(nodeId, state.mqtt_topic_root || 'oshex'));
+
+  // Sim cards
+  const simEntries = Object.entries(sims);
+  if (simEntries.length === 0) {
+    body.innerHTML += '<p style="font-size:0.8rem;color:#4b5563;margin-top:8px;">No simulations registered.</p>';
+  } else {
+    for (const [simName, simData] of simEntries) {
+      body.appendChild(buildSimCard(nodeId, simName, simData));
+    }
+  }
+
+  card.appendChild(body);
+  return card;
+}
+
+function buildNodeWildcards(nodeId, mqttRoot) {
+  const colId = `wildcards-${nodeId}`;
+  const wrapper = document.createElement('div');
+  wrapper.className = 'collapsible';
+  wrapper.id = colId;
+
+  const hdr = document.createElement('div');
+  hdr.className = 'collapsible-header';
+  hdr.innerHTML = `<span class="chevron">&#9658;</span>MQTT Wildcards`;
+  hdr.addEventListener('click', () => toggleCollapsible(colId));
+  wrapper.appendChild(hdr);
+
+  const body = document.createElement('div');
+  body.className = 'collapsible-body';
+  const subs = _subscriptions.get(nodeId) || new Set();
+
+  for (const def of GLOBAL_TOPIC_DEFS) {
+    const topic = `${mqttRoot}/${def.suffix}`;
+    body.appendChild(buildTopicRow(
+      `wc-${nodeId}-${def.suffix.replace(/\W/g, '-')}`,
+      def.label, topic, subs.has(topic), nodeId,
+    ));
+  }
+  wrapper.appendChild(body);
+  wrapper.classList.add('open');
+  return wrapper;
+}
+
+// ── Sim Card Builder ───────────────────────────────────────────────────
+function buildSimCard(nodeId, simName, sim) {
+  const key  = `${nodeId}-${simName}`;
+  const card = document.createElement('div');
+  card.className = 'sim-card';
+  card.id = `card-${key}`;
+
+  // Header
+  const hdr = document.createElement('div');
+  hdr.className = 'sim-card-header';
+  hdr.innerHTML =
+    `<span class="sim-name">${escHtml(sim.name)}</span>` +
+    `<span class="status-badge ${sim.running ? 'running' : ''}" id="badge-${key}">` +
+      `${sim.running ? 'Running' : 'Stopped'}</span>` +
+    `<span class="sim-type">${escHtml(sim.type)}</span>`;
+  card.appendChild(hdr);
+
+  // Params grid
+  if (Object.keys(sim.params || {}).length > 0) {
+    const grid = document.createElement('div');
+    grid.className = 'params-grid';
+    for (const [pk, pv] of Object.entries(sim.params)) {
+      const item = document.createElement('div');
+      item.className = 'param-item';
+      item.innerHTML =
+        `<div class="param-label">${escHtml(pk)}</div>` +
+        `<div class="param-value" id="pv-${key}-${pk}">${escHtml(String(pv))}</div>`;
+      grid.appendChild(item);
+    }
+    card.appendChild(grid);
+  }
+
+  // Start / Stop buttons
+  const btnRow = document.createElement('div');
+  btnRow.className = 'btn-row';
+
+  const btnStart = document.createElement('button');
+  btnStart.className = 'btn-start';
+  btnStart.textContent = 'Start';
+  btnStart.disabled = sim.running;
+  btnStart.id = `btn-start-${key}`;
+  btnStart.onclick = () => simAction(nodeId, simName, 'start');
+
+  const btnStop = document.createElement('button');
+  btnStop.className = 'btn-stop';
+  btnStop.textContent = 'Stop';
+  btnStop.disabled = !sim.running;
+  btnStop.id = `btn-stop-${key}`;
+  btnStop.onclick = () => simAction(nodeId, simName, 'stop');
+
+  btnRow.appendChild(btnStart);
+  btnRow.appendChild(btnStop);
+  card.appendChild(btnRow);
+
+  // Per-sim MQTT topic toggles
+  if (Object.keys(sim.topics || {}).length > 0) {
+    card.appendChild(buildTopicsCollapsible(nodeId, simName, sim.topics));
+  }
+
+  // Counter command form (built-in sim only)
+  if (sim.type === 'ControllableCounterSim') {
+    card.appendChild(buildCounterCommandForm(nodeId, simName, sim.params));
+  }
+
+  // Custom sim field summary
+  if (sim.type === 'CustomSim' && sim.spec) {
+    card.appendChild(buildCustomSimSummary(sim.spec));
+  }
+
+  return card;
+}
+
+// ── Topic Rows ─────────────────────────────────────────────────────────
+const TOPIC_LABELS = {
+  observations:         'Observations',
+  datastream_events:    'DS Events',
+  commands:             'Commands',
+  control_status:       'CS Status',
+  controlstream_events: 'CS Events',
+};
+
+function buildTopicsCollapsible(nodeId, simName, topics) {
+  const key   = `${nodeId}-${simName}`;
+  const colId = `topics-${key}`;
+  const wrapper = document.createElement('div');
+  wrapper.className = 'collapsible';
+  wrapper.id = colId;
+
+  const hdr = document.createElement('div');
+  hdr.className = 'collapsible-header';
+  hdr.innerHTML = `<span class="chevron">&#9658;</span>MQTT Topics`;
+  hdr.addEventListener('click', () => toggleCollapsible(colId));
+  wrapper.appendChild(hdr);
+
+  const body = document.createElement('div');
+  body.className = 'collapsible-body';
+  const subs = _subscriptions.get(nodeId) || new Set();
+
+  for (const [label, topic] of Object.entries(topics)) {
+    body.appendChild(buildTopicRow(
+      `t-${key}-${label}`,
+      TOPIC_LABELS[label] || label,
+      topic,
+      subs.has(topic),
+      nodeId,
+    ));
+  }
+  wrapper.appendChild(body);
+
+  if (Object.values(topics).some(t => subs.has(t))) wrapper.classList.add('open');
+  return wrapper;
+}
+
+function buildTopicRow(id, label, topic, checked, nodeId) {
+  const color = topicColor(topic);
+  const row   = document.createElement('div');
+  row.className = 'topic-row';
+  row.innerHTML =
+    `<span class="topic-label">${escHtml(label)}</span>` +
+    `<span class="topic-dot" style="background:${color}"></span>` +
+    `<span class="topic-string" style="color:${color}" title="${escHtml(topic)}">${escHtml(topic)}</span>` +
+    `<label class="toggle">` +
+      `<input type="checkbox" id="${escHtml(id)}" ${checked ? 'checked' : ''} data-topic="${escHtml(topic)}">` +
+      `<span class="toggle-slider"></span>` +
+    `</label>`;
+  row.querySelector('input').addEventListener('change', (e) => mqttToggle(nodeId, e.target));
+  return row;
+}
+
+// ── Custom Sim Summary ─────────────────────────────────────────────────
+function buildCustomSimSummary(spec) {
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'border-top:1px solid #2d3748;padding-top:10px;margin-top:4px;';
+
+  const title = document.createElement('div');
+  title.style.cssText = 'font-size:0.72rem;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;';
+  title.textContent = `Fields · every ${spec.interval ?? 5}s`;
+  wrap.appendChild(title);
+
+  const grid = document.createElement('div');
+  grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px;';
+
+  for (const f of (spec.fields || [])) {
+    const chip = document.createElement('div');
+    chip.style.cssText = 'background:#0f1117;border:1px solid #2d3748;border-radius:5px;padding:5px 8px;';
+    chip.innerHTML =
+      `<div style="font-size:0.7rem;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(f.label || f.name)}</div>` +
+      `<div style="font-size:0.65rem;color:#4b5563;">${escHtml(f.type)} · ${escHtml(f.behavior)}` +
+      (f.unit ? ` · ${escHtml(f.unit)}` : '') + `</div>`;
+    grid.appendChild(chip);
+  }
+  wrap.appendChild(grid);
+  return wrap;
+}
+
+// ── Counter Command Form ───────────────────────────────────────────────
+function buildCounterCommandForm(nodeId, simName, params) {
+  const key  = `${nodeId}-${simName}`;
+  const form = document.createElement('div');
+  form.className = 'command-form';
+  form.innerHTML = `<div class="command-form-title">Send Command</div>`;
+
+  const row1 = document.createElement('div');
+  row1.className = 'field-row';
+  row1.innerHTML =
+    `<div class="field-group"><label>Lower Bound</label>
+       <input type="number" id="cmd-lb-${key}" value="${params.lower_bound ?? 0}"></div>
+     <div class="field-group"><label>Upper Bound</label>
+       <input type="number" id="cmd-ub-${key}" value="${params.upper_bound ?? 100}"></div>`;
+
+  const row2 = document.createElement('div');
+  row2.className = 'field-row';
+  row2.innerHTML =
+    `<div class="field-group"><label>Step</label>
+       <input type="number" id="cmd-step-${key}" value="${params.step ?? 10}"></div>`;
+
+  const chk = document.createElement('div');
+  chk.className = 'checkbox-row';
+  chk.innerHTML =
+    `<input type="checkbox" id="cmd-cd-${key}" ${params.count_down ? 'checked' : ''}>
+     <label for="cmd-cd-${key}">Count Down</label>`;
+
+  const sendBtn = document.createElement('button');
+  sendBtn.className = 'btn-send';
+  sendBtn.textContent = 'Send';
+  sendBtn.onclick = () => sendCounterCommand(nodeId, simName);
+
+  form.appendChild(row1);
+  form.appendChild(row2);
+  form.appendChild(chk);
+  form.appendChild(sendBtn);
+  return form;
+}
+
+// ── Sim Actions ────────────────────────────────────────────────────────
+async function simAction(nodeId, simName, action) {
+  const res = await fetch(`/api/nodes/${nodeId}/sims/${simName}/${action}`, { method: 'POST' });
+  if (!res.ok) {
+    console.error(`Failed to ${action} sim ${simName} on node ${nodeId}:`, await res.text());
+    return;
+  }
+  // Reload sims for this node and rebuild its card so topic toggles refresh
+  const simsRes = await fetch(`/api/nodes/${nodeId}/sims`);
+  const sims = await simsRes.json();
+  const entry = _nodes.get(nodeId);
+  if (!entry) return;
+  entry.sims = sims;
+  const oldCard = document.getElementById(`node-card-${nodeId}`);
+  if (oldCard) oldCard.replaceWith(buildNodeCard(nodeId, entry.state, sims));
+}
+
+async function sendCounterCommand(nodeId, simName) {
+  const key  = `${nodeId}-${simName}`;
+  const body = {
+    setLowerBound: parseInt(document.getElementById(`cmd-lb-${key}`).value),
+    setUpperBound: parseInt(document.getElementById(`cmd-ub-${key}`).value),
+    setStep:       parseInt(document.getElementById(`cmd-step-${key}`).value),
+    setCountDown:  document.getElementById(`cmd-cd-${key}`).checked,
+  };
+  const res = await fetch(`/api/nodes/${nodeId}/sims/${simName}/command`, {
+    method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body),
+  });
+  if (!res.ok) console.error('Command failed:', await res.text());
+}
+
+// ── Lightweight sim-state refresh (badges + params only) ───────────────
+function refreshSim(nodeId, simName, simData) {
+  const key    = `${nodeId}-${simName}`;
+  const badge  = document.getElementById(`badge-${key}`);
+  const btnS   = document.getElementById(`btn-start-${key}`);
+  const btnSt  = document.getElementById(`btn-stop-${key}`);
+  if (badge) {
+    badge.textContent = simData.running ? 'Running' : 'Stopped';
+    badge.className   = `status-badge ${simData.running ? 'running' : ''}`;
+  }
+  if (btnS)  btnS.disabled  = simData.running;
+  if (btnSt) btnSt.disabled = !simData.running;
+  for (const [pk, pv] of Object.entries(simData.params || {})) {
+    const el = document.getElementById(`pv-${key}-${pk}`);
+    if (el) el.textContent = String(pv);
+  }
+}
+
+// Poll sim states every 3 s — light-weight badge/param updates only
+setInterval(async () => {
+  for (const [nodeId] of _nodes) {
+    try {
+      const res = await fetch(`/api/nodes/${nodeId}/sims`);
+      if (!res.ok) continue;
+      const sims = await res.json();
+      const entry = _nodes.get(nodeId);
+      if (entry) entry.sims = sims;
+      for (const [simName, simData] of Object.entries(sims)) {
+        refreshSim(nodeId, simName, simData);
+      }
+    } catch { /* ignore transient errors */ }
+  }
+}, 3000);
+
+// ── Init ───────────────────────────────────────────────────────────────
+async function init() {
+  connectWS();
+  // Re-render any nodes that were connected before the page loaded
+  try {
+    const res = await fetch('/api/nodes');
+    if (!res.ok) return;
+    const nodes = await res.json();
+    const placeholder = document.getElementById('no-node-msg');
+    for (const [nodeId, state] of Object.entries(nodes)) {
+      await loadSubscriptions(nodeId);
+      const simsRes = await fetch(`/api/nodes/${nodeId}/sims`);
+      const sims = await simsRes.json();
+      _nodes.set(nodeId, { state, sims });
+      if (placeholder) placeholder.remove();
+      document.getElementById('node-list').appendChild(buildNodeCard(nodeId, state, sims));
+    }
+  } catch (e) {
+    console.error('Init error:', e);
+  }
+}
+
+init();
+</script>
+</body>
+</html>

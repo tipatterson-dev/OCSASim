@@ -12,7 +12,9 @@ from oshconnect.csapi4py.constants import APIResourceTypes
 from oshconnect.swe_components import DataRecordSchema, TimeSchema, CountSchema, BooleanSchema, VectorSchema, \
     QuantitySchema
 from oshconnect.timemanagement import TimeInstant
-from pydantic.v1.utils import to_lower_camel
+def to_lower_camel(s: str) -> str:
+    parts = s.split('_')
+    return parts[0] + ''.join(p.title() for p in parts[1:])
 
 from sims.sim import Sim
 
@@ -66,7 +68,7 @@ class LoBSim(Sim):
                """
         self.system = System(name=to_lower_camel(self.name), label=self.name,
                              urn=f"urn:OCSASim:SimLoB:{self.name}", parent_node=self.node)
-        self.node.add_system(self.system, self.node, True)
+        self.node.add_system(self.system, True)
 
         self.datastream = self.system.add_insert_datastream(self.ds_schema)
 

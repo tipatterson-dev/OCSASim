@@ -6,6 +6,12 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
-    "oshconnect>=0.3.0a5",
-    "requests"
+    "oshconnect>=0.4.0a0",
+    "requests",
+    "fastapi>=0.111",
+    "uvicorn>=0.30",
+    "websockets>=12.0",
 ]
+
+[tool.uv.sources]
+oshconnect = { path = "/Users/cr31/PycharmProjects/OSHConnect-Python/dist/oshconnect-0.4.0a0-py3-none-any.whl" }

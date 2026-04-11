@@ -1,0 +1,181 @@
+{
+  "app_config": {
+    "node-f9804857-d907-48b8-b2f5-661214681187": {
+      "_id": "node-f9804857-d907-48b8-b2f5-661214681187",
+      "protocol": "http",
+      "address": "localhost",
+      "port": 8282,
+      "server_root": "sensorhub",
+      "api_root": "api",
+      "mqtt_topic_root": "oshex",
+      "is_secure": true,
+      "username": "admin",
+      "password": "admin",
+      "_systems": [
+        {
+          "id": "24504450-0d4a-49f0-91c9-f25b631b955a",
+          "resource_id": "02oujl7k68",
+          "topic": null,
+          "status": "stopped",
+          "parent_resource_id": null,
+          "connection_mode": "push",
+          "name": "lobsim",
+          "label": "LoBSim",
+          "urn": "urn:OCSASim:SimLoB:LoBSim",
+          "description": null,
+          "datastreams": [
+            {
+              "id": "aad76b96-d9e8-4d41-a80c-1d49ccabb7a5",
+              "resource_id": "02aubhmnjs0g",
+              "topic": null,
+              "status": "stopped",
+              "parent_resource_id": null,
+              "connection_mode": "push",
+              "should_poll": null,
+              "underlying_resource": {
+                "id": "02aubhmnjs0g",
+                "name": "LoB Sim",
+                "validTime": [
+                  "2026-04-11T01:27:54.000000Z",
+                  "2026-12-31T00:00:00.000000Z"
+                ],
+                "outputName": "LoB Sim",
+                "resultType": "record"
+              }
+            }
+          ],
+          "control_channels": [],
+          "underlying_resource": {
+            "type": "PhysicalSystem",
+            "uniqueId": "urn:OCSASim:SimLoB:LoBSim",
+            "label": "lobsim"
+          }
+        },
+        {
+          "id": "42b59b91-6136-4d31-9971-3029937a2ca1",
+          "resource_id": "027eljmqhd40",
+          "topic": null,
+          "status": "stopped",
+          "parent_resource_id": null,
+          "connection_mode": "push",
+          "name": "controllablecounter",
+          "label": "ControllableCounter",
+          "urn": "urn:OCSASim:ControllableCounter:ControllableCounter",
+          "description": null,
+          "datastreams": [
+            {
+              "id": "6121d74e-e6cd-4def-ad51-d035ea172c01",
+              "resource_id": "02uu9ie9uosg",
+              "topic": null,
+              "status": "stopped",
+              "parent_resource_id": null,
+              "connection_mode": "push",
+              "should_poll": null,
+              "underlying_resource": {
+                "id": "02uu9ie9uosg",
+                "name": "Controllable Counter",
+                "validTime": [
+                  "2026-04-11T01:27:54.000000Z",
+                  "2026-12-31T00:00:00.000000Z"
+                ],
+                "outputName": "Controllable Counter",
+                "resultType": "record"
+              }
+            }
+          ],
+          "control_channels": [],
+          "underlying_resource": {
+            "type": "PhysicalSystem",
+            "uniqueId": "urn:OCSASim:ControllableCounter:ControllableCounter",
+            "label": "controllablecounter"
+          }
+        },
+        {
+          "id": "d4e65a56-65c0-429f-830e-4763d250133a",
+          "resource_id": "02aa9jdaqtb0",
+          "topic": null,
+          "status": "stopped",
+          "parent_resource_id": null,
+          "connection_mode": "push",
+          "name": "customef9543",
+          "label": "customEf9543",
+          "urn": "urn:OCSASim:Custom:custom_ef9543",
+          "description": null,
+          "datastreams": [
+            {
+              "id": "9a6a68d5-5d01-4ab3-a56d-c4bb72cc18a0",
+              "resource_id": "035pns5rosm0",
+              "topic": null,
+              "status": "stopped",
+              "parent_resource_id": null,
+              "connection_mode": "push",
+              "should_poll": null,
+              "underlying_resource": {
+                "id": "035pns5rosm0",
+                "name": "Test Step Sim",
+                "validTime": [
+                  "2026-04-11T01:31:13.000000Z",
+                  "2026-12-31T00:00:00.000000Z"
+                ],
+                "outputName": "Test Step Sim",
+                "resultType": "record"
+              }
+            }
+          ],
+          "control_channels": [],
+          "underlying_resource": {
+            "type": "PhysicalSystem",
+            "uniqueId": "urn:OCSASim:Custom:custom_ef9543",
+            "label": "customef9543"
+          }
+        },
+        {
+          "id": "c22a52af-827c-46df-9c26-e7133c10d478",
+          "resource_id": "02mvd6n4n9ng",
+          "topic": null,
+          "status": "stopped",
+          "parent_resource_id": null,
+          "connection_mode": "push",
+          "name": "custom6c6204",
+          "label": "custom6C6204",
+          "urn": "urn:OCSASim:Custom:custom_6c6204",
+          "description": null,
+          "datastreams": [
+            {
+              "id": "9f381084-6445-480d-8f31-373353a97544",
+              "resource_id": "028ededms83g",
+              "topic": null,
+              "status": "stopped",
+              "parent_resource_id": null,
+              "connection_mode": "push",
+              "should_poll": null,
+              "underlying_resource": {
+                "id": "028ededms83g",
+                "name": "TEST Sim Builder - Temp",
+                "validTime": [
+                  "2026-04-11T01:28:46.000000Z",
+                  "2026-12-31T00:00:00.000000Z"
+                ],
+                "outputName": "TEST Sim Builder - Temp",
+                "resultType": "measure"
+              }
+            }
+          ],
+          "control_channels": [],
+          "underlying_resource": {
+            "type": "PhysicalSystem",
+            "uniqueId": "urn:OCSASim:Custom:custom_6c6204",
+            "label": "custom6c6204"
+          }
+        }
+      ],
+      "name": null,
+      "label": null,
+      "urn": null,
+      "description": null,
+      "datastreams": null,
+      "control_channels": null,
+      "underlying_resource": null
+    }
+  }
+}
