@@ -156,6 +156,26 @@ def mqtt_unsubscribe(node_id: str, body: dict):
     return {"status": "unsubscribed", "topic": topic}
 
 
+# ── External devices (node-scoped) ────────────────────────────────────────────
+
+@router.get("/api/nodes/{node_id}/devices")
+def get_external_devices(node_id: str):
+    """Return all auto-discovered external devices (e.g. Arduino) for a node."""
+    return {"devices": node_manager.get_external_devices(node_id)}
+
+
+@router.post("/api/nodes/{node_id}/devices/{name}/command")
+async def send_device_command(node_id: str, name: str, body: dict):
+    """Forward a direction/step command to an external device's control stream."""
+    err = node_manager.send_device_command(
+        node_id, name,
+        json.dumps({"id": "web-api", "parameters": body})
+    )
+    if err:
+        raise HTTPException(status_code=404, detail=err)
+    return {"status": "ok"}
+
+
 # ── WebSocket feed ─────────────────────────────────────────────────────────
 
 @router.websocket("/ws/mqtt")

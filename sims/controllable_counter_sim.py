@@ -9,6 +9,7 @@ from typing import Literal
 from oshconnect import OSHConnect, Node, System
 from oshconnect.api_utils import URI
 from oshconnect.csapi4py.constants import APIResourceTypes
+from oshconnect.streamableresource import StreamableModes
 from oshconnect.swe_components import DataRecordSchema, TimeSchema, CountSchema, BooleanSchema
 from oshconnect.timemanagement import TimeInstant
 def to_lower_camel(s: str) -> str:
@@ -83,7 +84,9 @@ class ControllableCounterSim(Sim):
         self.node.add_system(self.system, True)
 
         self.datastream = self.system.add_insert_datastream(self.ds_schema)
+        self.datastream.set_connection_mode(StreamableModes.BIDIRECTIONAL)
         self.controlstream = self.system.add_and_insert_control_stream(self.controlstream_schema)
+        self.controlstream.set_connection_mode(StreamableModes.BIDIRECTIONAL)
 
     def simulation(self):
         # check for commands

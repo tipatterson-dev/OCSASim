@@ -15,6 +15,7 @@ class MQTTBridge:
         self._monitors: dict[str, mqtt.Client] = {}     # node_id -> paho.Client
         self._subscriptions: dict[str, set[str]] = {}   # node_id -> {topics}
         self._lock = threading.Lock()
+        self._hooks: dict[str, callable] = {}            # node_id -> callback(node_id, topic, payload)
 
     def attach_loop(self, loop: asyncio.AbstractEventLoop):
         self._loop = loop
@@ -66,6 +67,7 @@ class MQTTBridge:
         with self._lock:
             client = self._monitors.pop(node_id, None)
             self._subscriptions.pop(node_id, None)
+        self._hooks.pop(node_id, None)
         if client is not None:
             try:
                 client.loop_stop()
@@ -89,13 +91,37 @@ class MQTTBridge:
     def _on_monitor_message(self, client, userdata, msg):
         """Called from paho's I/O thread — push onto the asyncio queue."""
         node_id = userdata
+        payload_str = msg.payload.decode("utf-8", errors="replace")
         payload = {
             "node_id": node_id,
             "topic": msg.topic,
-            "payload": msg.payload.decode("utf-8", errors="replace"),
+            "payload": payload_str,
         }
         if self._loop:
             self._loop.call_soon_threadsafe(self._queue.put_nowait, payload)
+        # Notify registered hook (e.g. for external device auto-discovery)
+        hook = self._hooks.get(node_id)
+        if hook is not None:
+            try:
+                hook(node_id, msg.topic, payload_str)
+            except Exception as exc:
+                logger.warning("MQTT hook [%s] raised: %s", node_id, exc)
+
+    def register_message_hook(self, node_id: str, callback) -> None:
+        """Register a callback called on every MQTT message for *node_id*.
+
+        Signature: callback(node_id: str, topic: str, payload: str) -> None
+        Called from paho's I/O thread — keep it fast and non-blocking.
+        """
+        self._hooks[node_id] = callback
+
+    def unregister_message_hook(self, node_id: str) -> None:
+        self._hooks.pop(node_id, None)
+
+    def broadcast_event(self, event: dict) -> None:
+        """Push a non-MQTT event (e.g. device_discovered) to all WebSocket clients."""
+        if self._loop:
+            self._loop.call_soon_threadsafe(self._queue.put_nowait, event)
 
     # ── Subscription management ────────────────────────────────────────────
 

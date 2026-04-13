@@ -296,6 +296,17 @@
     /* color set inline per topic */
   }
 
+  /* Topic group label inside wildcards collapsible */
+  .topic-group-label {
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: #4b5563;
+    margin: 8px 0 4px;
+  }
+  .topic-group-label:first-child { margin-top: 2px; }
+
   /* Toggle switch */
   .toggle { position: relative; display: inline-block; width: 34px; height: 18px; flex-shrink: 0; }
   .toggle input { opacity: 0; width: 0; height: 0; }
@@ -352,6 +363,62 @@
   .checkbox-row label { font-size: 0.82rem; color: #94a3b8; }
 
   #no-node-msg { color: #4b5563; font-size: 0.85rem; font-style: italic; }
+
+  /* ── External Device Cards ─────────────────────────────────────────── */
+  .device-card {
+    background: #1a2030;
+    border: 1px solid #2d3748;
+    border-left: 3px solid #7c3aed;
+    border-radius: 8px;
+    padding: 14px;
+    margin-bottom: 10px;
+  }
+  .device-card:last-child { margin-bottom: 14px; }
+
+  .device-card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .device-name  { font-weight: 600; font-size: 0.95rem; }
+  .device-type  { font-size: 0.72rem; color: #7c3aed; margin-left: auto; }
+
+  .sensor-readout {
+    font-family: "Fira Code", "Cascadia Code", monospace;
+    font-size: 1.1rem;
+    font-weight: 500;
+  }
+
+  .device-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-top: 1px solid #2d3748;
+    padding-top: 10px;
+    margin-top: 4px;
+    flex-wrap: wrap;
+  }
+  .device-controls label {
+    font-size: 0.72rem;
+    color: #64748b;
+  }
+  .device-controls input[type="number"] {
+    width: 70px;
+  }
+  .btn-dir {
+    background: #4c1d95;
+    color: #c4b5fd;
+    border: 1px solid #6d28d9;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: opacity 0.15s;
+    min-width: 70px;
+  }
+  .btn-dir:hover { opacity: 0.85; }
 
   /* ── MQTT feed panel ───────────────────────────────────────────────── */
   #feed-header { flex-shrink: 0; }
@@ -524,7 +591,16 @@ function connectWS() {
 
   ws.onopen  = () => { dot.classList.add('connected');    label.textContent = 'Connected';     };
   ws.onclose = () => { dot.classList.remove('connected'); label.textContent = 'Reconnecting…'; setTimeout(connectWS, 3000); };
-  ws.onmessage = (e) => { if (!paused) appendFeedItem(JSON.parse(e.data)); };
+  ws.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    if (msg.type === 'device_discovered') {
+      handleDeviceDiscovered(msg.node_id, msg.device);
+    } else {
+      // Regular MQTT message — update device readouts then feed
+      updateDeviceReadouts(msg.node_id, msg.topic, msg.payload);
+      if (!paused) appendFeedItem(msg);
+    }
+  };
 }
 
 function appendFeedItem({ node_id, topic, payload }) {
@@ -666,10 +742,31 @@ async function clearDatastore() {
 }
 
 // ── Node Card Builder ──────────────────────────────────────────────────
-const GLOBAL_TOPIC_DEFS = [
-  { label: 'All Systems',        suffix: 'systems/#'        },
-  { label: 'All Datastreams',    suffix: 'datastreams/#'    },
-  { label: 'All ControlStreams', suffix: 'controlstreams/#' },
+// Groups shown in the MQTT Wildcards collapsible for each node.
+// Each group renders a small header label then one toggle per entry.
+// suffix is appended to "{mqttRoot}/" to form the full MQTT topic.
+const GLOBAL_TOPIC_GROUPS = [
+  {
+    group: 'Broad (all data + events)',
+    topics: [
+      { label: 'All Systems',        suffix: 'systems/#'        },
+      { label: 'All Datastreams',    suffix: 'datastreams/#'    },
+      { label: 'All ControlStreams', suffix: 'controlstreams/#' },
+    ],
+  },
+  {
+    group: 'Resource Events only',
+    topics: [
+      { label: 'System Events',      suffix: 'systems/+'        },
+      { label: 'Datastream Events',  suffix: 'datastreams/+'    },
+    ],
+  },
+  {
+    group: 'Observations only',
+    topics: [
+      { label: 'All Observations',   suffix: 'datastreams/+/observations' },
+    ],
+  },
 ];
 
 function buildNodeCard(nodeId, state, sims) {
@@ -704,6 +801,9 @@ function buildNodeCard(nodeId, state, sims) {
     }
   }
 
+  // External devices section (populated dynamically via MQTT discovery)
+  body.appendChild(buildDevicesSection(nodeId));
+
   card.appendChild(body);
   return card;
 }
@@ -724,13 +824,22 @@ function buildNodeWildcards(nodeId, mqttRoot) {
   body.className = 'collapsible-body';
   const subs = _subscriptions.get(nodeId) || new Set();
 
-  for (const def of GLOBAL_TOPIC_DEFS) {
-    const topic = `${mqttRoot}/${def.suffix}`;
-    body.appendChild(buildTopicRow(
-      `wc-${nodeId}-${def.suffix.replace(/\W/g, '-')}`,
-      def.label, topic, subs.has(topic), nodeId,
-    ));
+  for (const grp of GLOBAL_TOPIC_GROUPS) {
+    // Group label
+    const grpLabel = document.createElement('div');
+    grpLabel.className = 'topic-group-label';
+    grpLabel.textContent = grp.group;
+    body.appendChild(grpLabel);
+
+    for (const def of grp.topics) {
+      const topic = `${mqttRoot}/${def.suffix}`;
+      body.appendChild(buildTopicRow(
+        `wc-${nodeId}-${def.suffix.replace(/\W/g, '-')}`,
+        def.label, topic, subs.has(topic), nodeId,
+      ));
+    }
   }
+
   wrapper.appendChild(body);
   wrapper.classList.add('open');
   return wrapper;
@@ -995,6 +1104,172 @@ setInterval(async () => {
   }
 }, 3000);
 
+// ── External Device state ──────────────────────────────────────────────
+// node_id → Map<system_id, device>
+const _devices = new Map();
+// topic → {nodeId, systemId} for fast readout routing
+const _topicDeviceMap = new Map();
+
+function handleDeviceDiscovered(nodeId, device) {
+  if (!_devices.has(nodeId)) _devices.set(nodeId, new Map());
+  const devMap = _devices.get(nodeId);
+  if (!devMap.has(device.system_id)) {
+    devMap.set(device.system_id, device);
+    // Build reverse topic index
+    for (const t of (device.topics.observations || [])) {
+      _topicDeviceMap.set(t, { nodeId, systemId: device.system_id });
+    }
+    // Render into node card
+    const section = document.getElementById(`devices-body-${nodeId}`);
+    if (section) {
+      section.innerHTML = ''; // clear placeholder
+      for (const d of devMap.values()) section.appendChild(buildDeviceCard(nodeId, d));
+      // Open the collapsible
+      const col = document.getElementById(`devices-col-${nodeId}`);
+      if (col) col.classList.add('open');
+    }
+  } else {
+    // Already known — just refresh
+    devMap.set(device.system_id, device);
+    refreshDeviceCard(nodeId, device);
+  }
+}
+
+function updateDeviceReadouts(nodeId, topic, payloadStr) {
+  if (!topic) return;
+  const ref = _topicDeviceMap.get(topic);
+  if (!ref) return;
+  try {
+    const data   = JSON.parse(payloadStr);
+    const result = data.result || {};
+    const devMap = _devices.get(ref.nodeId);
+    if (!devMap) return;
+    const dev = devMap.get(ref.systemId);
+    if (!dev) return;
+    let changed = false;
+    if ('temperature' in result) { dev.last_temp  = result.temperature; changed = true; }
+    if ('count'       in result) { dev.last_count = result.count;       changed = true; }
+    dev.online = true;
+    if (changed) refreshDeviceCard(ref.nodeId, dev);
+  } catch {}
+}
+
+// ── External Device Card Builder ───────────────────────────────────────
+function buildDevicesSection(nodeId) {
+  const colId   = `devices-col-${nodeId}`;
+  const bodyId  = `devices-body-${nodeId}`;
+  const wrapper = document.createElement('div');
+  wrapper.className = 'collapsible';
+  wrapper.id = colId;
+
+  const hdr = document.createElement('div');
+  hdr.className = 'collapsible-header';
+  hdr.innerHTML = `<span class="chevron">&#9658;</span>External Devices`;
+  hdr.addEventListener('click', () => toggleCollapsible(colId));
+  wrapper.appendChild(hdr);
+
+  const body = document.createElement('div');
+  body.className = 'collapsible-body';
+  body.id = bodyId;
+  body.innerHTML = '<p style="font-size:0.8rem;color:#4b5563;padding:4px 0 8px;">Waiting for devices…</p>';
+  wrapper.appendChild(body);
+  return wrapper;
+}
+
+function buildDeviceCard(nodeId, dev) {
+  const card = document.createElement('div');
+  card.className = 'device-card';
+  card.id = `dev-card-${nodeId}-${dev.system_id}`;
+
+  // Header
+  const hdr = document.createElement('div');
+  hdr.className = 'device-card-header';
+  hdr.innerHTML =
+    `<div class="node-status-dot ${dev.online ? 'connected' : ''}" id="dev-dot-${nodeId}-${dev.system_id}"></div>` +
+    `<span class="device-name">${escHtml(dev.system_label || dev.name)}</span>` +
+    `<span class="device-type">External Device</span>`;
+  card.appendChild(hdr);
+
+  // Sensor readouts
+  const grid = document.createElement('div');
+  grid.className = 'params-grid';
+  grid.innerHTML =
+    `<div class="param-item">
+       <div class="param-label">Temperature</div>
+       <div class="param-value sensor-readout" id="dev-temp-${nodeId}-${dev.system_id}">
+         ${dev.last_temp != null ? dev.last_temp.toFixed(1) + ' °C' : '—'}
+       </div>
+     </div>
+     <div class="param-item">
+       <div class="param-label">Counter</div>
+       <div class="param-value sensor-readout" id="dev-count-${nodeId}-${dev.system_id}">
+         ${dev.last_count != null ? dev.last_count : '—'}
+       </div>
+     </div>`;
+  card.appendChild(grid);
+
+  // Controls (only shown if device has a command topic)
+  if (dev.topics.commands) {
+    const ctrl = document.createElement('div');
+    ctrl.className = 'device-controls';
+    ctrl.innerHTML =
+      `<button class="btn-dir" id="dev-dir-${nodeId}-${dev.system_id}" data-up="true"
+               onclick="toggleDeviceDirection('${nodeId}','${dev.system_id}')">&#9650; Up</button>
+       <label>Step</label>
+       <input type="number" id="dev-step-${nodeId}-${dev.system_id}" value="1" min="1" max="100">
+       <button class="btn-send" onclick="sendDeviceCommand('${nodeId}','${dev.system_id}','${escHtml(dev.name)}')">Send</button>`;
+    card.appendChild(ctrl);
+  }
+
+  return card;
+}
+
+function refreshDeviceCard(nodeId, dev) {
+  const sid = dev.system_id;
+  const dot   = document.getElementById(`dev-dot-${nodeId}-${sid}`);
+  const temp  = document.getElementById(`dev-temp-${nodeId}-${sid}`);
+  const count = document.getElementById(`dev-count-${nodeId}-${sid}`);
+  if (dot)   { dot.classList.toggle('connected', !!dev.online); }
+  if (temp)  { temp.textContent  = dev.last_temp  != null ? Number(dev.last_temp).toFixed(1)  + ' °C' : '—'; }
+  if (count) { count.textContent = dev.last_count != null ? dev.last_count : '—'; }
+}
+
+function toggleDeviceDirection(nodeId, systemId) {
+  const btn = document.getElementById(`dev-dir-${nodeId}-${systemId}`);
+  if (!btn) return;
+  const isUp = btn.dataset.up === 'true';
+  btn.dataset.up   = isUp ? 'false' : 'true';
+  btn.textContent  = isUp ? '▼ Down' : '▲ Up';
+}
+
+async function sendDeviceCommand(nodeId, systemId, devName) {
+  const btn     = document.getElementById(`dev-dir-${nodeId}-${systemId}`);
+  const stepEl  = document.getElementById(`dev-step-${nodeId}-${systemId}`);
+  const dirUp   = btn ? btn.dataset.up === 'true' : true;
+  const step    = stepEl ? parseInt(stepEl.value, 10) : 1;
+
+  const res = await fetch(`/api/nodes/${nodeId}/devices/${encodeURIComponent(devName)}/command`, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ direction_up: dirUp, step }),
+  });
+  if (!res.ok) console.error('Device command failed:', await res.text());
+}
+
+// Poll device states every 5 s to keep online/offline dots current
+setInterval(async () => {
+  for (const [nodeId] of _nodes) {
+    try {
+      const res = await fetch(`/api/nodes/${nodeId}/devices`);
+      if (!res.ok) continue;
+      const { devices } = await res.json();
+      for (const dev of devices) {
+        handleDeviceDiscovered(nodeId, dev);
+      }
+    } catch { /* ignore */ }
+  }
+}, 5000);
+
 // ── Init ───────────────────────────────────────────────────────────────
 async function init() {
   connectWS();
@@ -1011,6 +1286,14 @@ async function init() {
       _nodes.set(nodeId, { state, sims });
       if (placeholder) placeholder.remove();
       document.getElementById('node-list').appendChild(buildNodeCard(nodeId, state, sims));
+      // Restore any already-discovered external devices
+      try {
+        const devRes = await fetch(`/api/nodes/${nodeId}/devices`);
+        if (devRes.ok) {
+          const { devices } = await devRes.json();
+          for (const dev of devices) handleDeviceDiscovered(nodeId, dev);
+        }
+      } catch {}
     }
   } catch (e) {
     console.error('Init error:', e);
