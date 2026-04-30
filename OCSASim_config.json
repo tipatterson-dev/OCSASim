@@ -1,13 +1,13 @@
 {
   "app_config": {
-    "node-4123fb3d-0722-4fec-aa9e-41400b8103ba": {
-      "_id": "node-4123fb3d-0722-4fec-aa9e-41400b8103ba",
+    "node-9de17fce-0007-412d-9c77-627d5f30d893": {
+      "_id": "node-9de17fce-0007-412d-9c77-627d5f30d893",
       "protocol": "http",
       "address": "localhost",
-      "port": 8282,
+      "port": 8382,
       "server_root": "sensorhub",
       "api_root": "api",
-      "mqtt_topic_root": "oshex",
+      "mqtt_topic_root": "api",
       "is_secure": true,
       "username": "admin",
       "password": "admin",

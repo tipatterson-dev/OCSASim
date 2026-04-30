@@ -186,6 +186,7 @@ def connect(protocol: str, host: str, port: int, username: str, password: str,
         return node_id, None
 
     except Exception as e:
+        logger.exception("connect() failed for %s:%s", host, port)
         return None, str(e)
 
 
@@ -224,13 +225,34 @@ def create_custom_sim(node_id: str, spec: dict) -> tuple[str | None, str | None]
 # "oshex/api/datastreams/{id}/observations" (with optional prefix).
 _DS_OBS_RE = re.compile(r'(?:^|/)datastreams/([^/]+)/observations$')
 
+# Regex to detect a command data topic for any control stream.
+_CS_CMD_RE = re.compile(r'(?:^|/)controlstreams/([^/]+)/commands')
+
 
 def _on_mqtt_message(node_id: str, topic: str, payload: str) -> None:
     """
     Hook called on every MQTT message for *node_id* (from paho I/O thread).
     Detects observation messages from unknown systems and triggers discovery.
+    Routes command messages to the matching sim's parse_command().
     Routes messages for already-known external devices to their on_message().
     """
+    # Route command messages into the owning sim's controlstream inbound deque
+    # so cmd_listener picks them up naturally.
+    if _CS_CMD_RE.search(topic):
+        for sim in sim_registry.get_all_for_node(node_id):
+            cs = getattr(sim, "controlstream", None)
+            if cs is None:
+                continue
+            try:
+                cmd_topic = cs.get_mqtt_topic(
+                    subresource=APIResourceTypes.COMMAND, data_topic=True)
+            except Exception:
+                continue
+            if cmd_topic and topic == cmd_topic:
+                cs.get_inbound_deque().append(payload)
+                return
+        return
+
     # Check if this is a datastream observation topic
     m = _DS_OBS_RE.search(topic)
     if not m:

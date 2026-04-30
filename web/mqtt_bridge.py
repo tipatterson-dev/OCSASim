@@ -4,6 +4,30 @@ import threading
 
 import paho.mqtt.client as mqtt
 
+# paho-mqtt 2.x's Client.__del__ reaches self._sock without a hasattr guard,
+# raising AttributeError on Python 3.14 during interpreter shutdown after the
+# loop thread is torn down. Wrap the finalizer to swallow that spurious error.
+_paho_original_del = mqtt.Client.__del__
+
+
+def _paho_safe_del(self):
+    try:
+        _paho_original_del(self)
+    except AttributeError:
+        pass
+
+
+mqtt.Client.__del__ = _paho_safe_del
+
+# A paho Client wraps a live socket, which `socket.__getstate__` refuses to
+# pickle. oshconnect's EventBuilder.build() calls `event.model_copy(deep=True)`
+# on events whose data field is a Node — that walks the Node graph into the
+# Client and hits the socket. Treat the Client as a singleton resource that
+# aliases on copy/deepcopy so the walk stops at the boundary.
+mqtt.Client.__deepcopy__ = lambda self, memo=None: self
+mqtt.Client.__copy__ = lambda self: self
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -136,6 +160,16 @@ class MQTTBridge:
         if client is not None:
             client.subscribe(topic, qos=0)
             logger.debug("MQTT [%s] subscribed to %s", node_id, topic)
+
+    def publish_topic(self, node_id: str, topic: str, payload: str):
+        """Publish *payload* to *topic* using the monitor client for *node_id*."""
+        with self._lock:
+            client = self._monitors.get(node_id)
+        if client is not None:
+            client.publish(topic, payload, qos=0)
+            logger.debug("MQTT [%s] published to %s", node_id, topic)
+        else:
+            logger.warning("MQTT [%s] no monitor client — cannot publish to %s", node_id, topic)
 
     def unsubscribe_topic(self, node_id: str, topic: str):
         with self._lock:

@@ -4,6 +4,7 @@ import json
 from fastapi import APIRouter, Body, HTTPException, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 
+from oshconnect.csapi4py.constants import APIResourceTypes
 from web.mqtt_bridge import bridge
 from web.sim_registry import get, list_for_node, get_topics
 import web.node_manager as node_manager
@@ -119,9 +120,43 @@ async def send_command(node_id: str, name: str, body: dict):
     sim = get(node_id, name)
     if not sim:
         raise HTTPException(status_code=404, detail=f"Sim '{name}' not found for node '{node_id}'")
-    if not hasattr(sim, "parse_command"):
+    cs = getattr(sim, "controlstream", None)
+    if cs is None:
         raise HTTPException(status_code=400, detail=f"Sim '{name}' does not support commands")
-    sim.parse_command(json.dumps({"id": "web-api", "parameters": body}))
+    if not sim.should_simulate:
+        raise HTTPException(status_code=400, detail=f"Sim '{name}' must be running to send commands")
+
+    # Only send parameters that differ from the sim's current state
+    state_map = {
+        "setCountDown": "count_down",
+        "setStep":      "step",
+        "setLowerBound": "lower_bound",
+        "setUpperBound": "upper_bound",
+    }
+    changed = {
+        k: v for k, v in body.items()
+        if k in state_map and getattr(sim, state_map[k], None) != v
+    }
+    if not changed:
+        return {"status": "ok", "note": "no changes"}
+
+    # POST to OSH — it validates, stores, and publishes to MQTT for the device
+    api = sim.node.get_api_helper()
+    cmd_body = {"parameters": changed}
+    loop = asyncio.get_event_loop()
+    resp = await loop.run_in_executor(
+        None,
+        lambda: api.create_resource(
+            APIResourceTypes.COMMAND,
+            json_data=cmd_body,
+            parent_res_id=cs._resource_id,
+        ),
+    )
+    if not resp.ok:
+        raise HTTPException(
+            status_code=502,
+            detail=f"OSH rejected command ({resp.status_code}): {resp.text}",
+        )
     return {"status": "ok"}
 
 
