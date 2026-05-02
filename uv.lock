@@ -558,7 +558,7 @@ requires-dist = [
 
 [[package]]
 name = "oshconnect"
-version = "0.4.0a0"
+version = "0.4.0a1"
 source = { registry = "http://localhost:8090/simple/" }
 dependencies = [
     { name = "aiohttp" },
@@ -569,7 +569,7 @@ dependencies = [
     { name = "websockets" },
 ]
 wheels = [
-    { url = "http://localhost:8090/packages/oshconnect-0.4.0a0-py3-none-any.whl", hash = "sha256:21e9336f47a02826c9628fab12cdd97e28c2665d7bdb8b1bc44312a673c892fc" },
+    { url = "http://localhost:8090/packages/oshconnect-0.4.0a1-py3-none-any.whl", hash = "sha256:2f4f9137a7014daaceba8bf43738931fb0c65330731b7a1316c9766d0d6beb34" },
 ]
 
 [[package]]

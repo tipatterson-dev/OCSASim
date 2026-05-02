@@ -1,17 +1,174 @@
 {
   "app_config": {
-    "node-9de17fce-0007-412d-9c77-627d5f30d893": {
-      "_id": "node-9de17fce-0007-412d-9c77-627d5f30d893",
+    "node-09d24dee-0efa-4f39-a4cb-45051ec9b82a": {
+      "_id": "node-09d24dee-0efa-4f39-a4cb-45051ec9b82a",
       "protocol": "http",
       "address": "localhost",
-      "port": 8382,
+      "port": 8282,
       "server_root": "sensorhub",
       "api_root": "api",
       "mqtt_topic_root": "api",
       "is_secure": true,
       "username": "admin",
       "password": "admin",
-      "_systems": [],
+      "_systems": [
+        {
+          "id": "2f664930-1fd1-4624-b117-acf605fc26a3",
+          "resource_id": "02oujl7k68",
+          "topic": null,
+          "status": "stopped",
+          "parent_resource_id": null,
+          "connection_mode": "push",
+          "name": "lobsim",
+          "label": "LoBSim",
+          "urn": "urn:OCSASim:SimLoB:LoBSim",
+          "description": null,
+          "datastreams": [
+            {
+              "id": "4888c4d5-1d5f-40c8-89d9-88edb26b16d1",
+              "resource_id": "03gepuk2r8d0",
+              "topic": null,
+              "status": "stopped",
+              "parent_resource_id": null,
+              "connection_mode": "push",
+              "should_poll": null,
+              "underlying_resource": {
+                "id": "03gepuk2r8d0",
+                "name": "LoB Sim",
+                "validTime": [
+                  "2026-04-30T15:11:54.845015Z",
+                  "2026-12-30T12:00:00.000000Z"
+                ],
+                "outputName": "LoB Sim",
+                "resultType": "record"
+              }
+            }
+          ],
+          "control_channels": [],
+          "underlying_resource": {
+            "type": "PhysicalSystem",
+            "uniqueId": "urn:OCSASim:SimLoB:LoBSim",
+            "label": "lobsim"
+          }
+        },
+        {
+          "id": "ff8cc3c9-b87f-42dd-8552-2c3cb74fa8e3",
+          "resource_id": "03pfd2dngt20",
+          "topic": null,
+          "status": "stopped",
+          "parent_resource_id": null,
+          "connection_mode": "push",
+          "name": "newSimulatedWeatherStationNetwork",
+          "label": "New Simulated Weather Station Network",
+          "urn": "urn:osh:sensor:simweathernetwork:001",
+          "description": null,
+          "datastreams": [
+            {
+              "id": "2b51b3fe-78f2-4bf1-a1f8-49725ca54e38",
+              "resource_id": "028sjd7bvd70",
+              "topic": null,
+              "status": "stopped",
+              "parent_resource_id": null,
+              "connection_mode": "push",
+              "should_poll": null,
+              "underlying_resource": {
+                "id": "028sjd7bvd70",
+                "name": "New Simulated Weather Station Network - weather",
+                "validTime": [
+                  "2026-04-30T20:20:08.275000Z",
+                  "now"
+                ],
+                "outputName": "weather",
+                "resultType": "record"
+              }
+            }
+          ],
+          "control_channels": [],
+          "underlying_resource": {
+            "type": "PhysicalSystem",
+            "uniqueId": "urn:osh:sensor:simweathernetwork:001",
+            "label": "newSimulatedWeatherStationNetwork"
+          }
+        },
+        {
+          "id": "92c608f2-77e3-45e8-b444-08de425b1e74",
+          "resource_id": "027eljmqhd40",
+          "topic": null,
+          "status": "stopped",
+          "parent_resource_id": null,
+          "connection_mode": "push",
+          "name": "controllablecounter",
+          "label": "ControllableCounter",
+          "urn": "urn:OCSASim:ControllableCounter:ControllableCounter",
+          "description": null,
+          "datastreams": [
+            {
+              "id": "59dad637-6c1e-4be3-bfdc-64d02e45794c",
+              "resource_id": "02qvvffkgov0",
+              "topic": null,
+              "status": "stopped",
+              "parent_resource_id": null,
+              "connection_mode": "push",
+              "should_poll": null,
+              "underlying_resource": {
+                "id": "02qvvffkgov0",
+                "name": "Controllable Counter",
+                "validTime": [
+                  "2026-04-30T15:11:54.830565Z",
+                  "2026-12-30T12:00:00.000000Z"
+                ],
+                "outputName": "Controllable Counter",
+                "resultType": "record"
+              }
+            }
+          ],
+          "control_channels": [],
+          "underlying_resource": {
+            "type": "PhysicalSystem",
+            "uniqueId": "urn:OCSASim:ControllableCounter:ControllableCounter",
+            "label": "controllablecounter"
+          }
+        },
+        {
+          "id": "e92f6c16-bdd6-4e54-91d0-ba05b5dfdd09",
+          "resource_id": "03ie1mkrr9r0",
+          "topic": null,
+          "status": "stopped",
+          "parent_resource_id": null,
+          "connection_mode": "push",
+          "name": "newSimulatedWeatherSensor",
+          "label": "New Simulated Weather Sensor",
+          "urn": "urn:osh:sensor:simweather:0123456879",
+          "description": null,
+          "datastreams": [
+            {
+              "id": "ff9e6aa9-1cc8-4dd5-ae86-21b534eb4f82",
+              "resource_id": "038s1ic7k460",
+              "topic": null,
+              "status": "stopped",
+              "parent_resource_id": null,
+              "connection_mode": "push",
+              "should_poll": null,
+              "underlying_resource": {
+                "id": "038s1ic7k460",
+                "name": "New Simulated Weather Sensor - weather",
+                "validTime": [
+                  "2026-04-04T22:54:09.165000Z",
+                  "now"
+                ],
+                "outputName": "weather",
+                "resultType": "record"
+              }
+            }
+          ],
+          "control_channels": [],
+          "underlying_resource": {
+            "type": "PhysicalSystem",
+            "uniqueId": "urn:osh:sensor:simweather:0123456879",
+            "label": "newSimulatedWeatherSensor"
+          }
+        }
+      ],
       "name": null,
       "label": null,
       "urn": null,

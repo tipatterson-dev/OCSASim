@@ -20,7 +20,7 @@ class NodeConfig(BaseModel):
     password: str = "admin"
     api_root: str = "api"
     mqtt_topic_root: str = "oshex"
-    use_datastore: bool = True
+    use_datastore: bool = False
 
 
 # ── Node Management ────────────────────────────────────────────────────────

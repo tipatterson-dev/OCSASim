@@ -519,12 +519,6 @@
     <label>MQTT Root</label>
     <input type="text" class="narrow" id="cfg-mqtt-root" value="oshex">
   </div>
-  <div class="field-group" style="justify-content:flex-end;padding-bottom:5px;">
-    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:0.75rem;color:#64748b;">
-      <input type="checkbox" id="cfg-use-datastore" checked style="width:14px;height:14px;cursor:pointer;">
-      Use Datastore
-    </label>
-  </div>
   <button class="btn-connect" id="btn-connect" onclick="connectNode()">+ Add Node</button>
   <button class="btn-clear-store" id="btn-clear-store" onclick="clearDatastore()" title="Delete all saved resources from the local datastore">Clear Store</button>
   <span id="connect-error"></span>
@@ -683,7 +677,6 @@ async function connectNode() {
     password:        document.getElementById('cfg-password').value,
     api_root:        document.getElementById('cfg-api-root').value.trim(),
     mqtt_topic_root: document.getElementById('cfg-mqtt-root').value.trim(),
-    use_datastore:   document.getElementById('cfg-use-datastore').checked,
   };
 
   try {

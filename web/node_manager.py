@@ -45,6 +45,24 @@ def _apply_connection_modes(sim) -> None:
         sim.controlstream.set_connection_mode(StreamableModes.BIDIRECTIONAL)
 
 
+def _ensure_controlstream(sim) -> None:
+    """If *sim* declares a controlstream_schema but restore left .controlstream as None,
+    insert the controlstream now so cmd_listener has something to subscribe to.
+
+    Old datastore rows may predate controlstream persistence, and the server may not have
+    a controlstream for a system that was inserted before this sim's schema required one.
+    """
+    schema = getattr(sim, 'controlstream_schema', None)
+    if schema is None or sim.controlstream is not None or sim.system is None:
+        return
+    try:
+        sim.controlstream = sim.system.add_and_insert_control_stream(schema)
+        sim.controlstream.set_connection_mode(StreamableModes.BIDIRECTIONAL)
+        logger.info("Inserted missing controlstream for '%s'", sim.name)
+    except Exception as e:
+        logger.warning("Could not insert missing controlstream for '%s': %s", sim.name, e)
+
+
 def _restore_sim_from_store(osh, node, sim, target_urn: str) -> bool:
     """
     Try to restore sim.system / .datastream / .controlstream from the SQLite datastore.
@@ -63,8 +81,15 @@ def _restore_sim_from_store(osh, node, sim, target_urn: str) -> bool:
                     new_sys = OSHSystem.deserialize(old_sys.serialize(), node)
                     sim.system = new_sys
                     sim.datastream = new_sys.datastreams[0] if new_sys.datastreams else None
+                    # Stored serialization may omit control channels — query the server.
+                    if not new_sys.control_channels:
+                        try:
+                            new_sys.discover_controlstreams()
+                        except Exception as e:
+                            logger.warning("discover_controlstreams for '%s' failed: %s", sim.name, e)
                     sim.controlstream = new_sys.control_channels[0] if new_sys.control_channels else None
                     node._systems.append(new_sys)
+                    _ensure_controlstream(sim)
                     _apply_connection_modes(sim)
                     logger.info("Restored '%s' from datastore (system_id=%s)", sim.name, new_sys._resource_id)
                     return True
@@ -100,6 +125,7 @@ def _restore_sim_from_node(node, sim, target_urn: str) -> bool:
             except Exception as e:
                 logger.warning("discover_controlstreams for '%s' failed: %s", sim.name, e)
         sim.controlstream = sys.control_channels[0] if sys.control_channels else None
+        _ensure_controlstream(sim)
         _apply_connection_modes(sim)
         logger.info("Restored '%s' from discovered node systems (system_id=%s)", sim.name, sys._resource_id)
         return True
@@ -114,7 +140,7 @@ def clear_store() -> None:
 
 def connect(protocol: str, host: str, port: int, username: str, password: str,
             api_root: str = "api", mqtt_topic_root: str = "oshex",
-            use_datastore: bool = True) -> tuple[str | None, str | None]:
+            use_datastore: bool = False) -> tuple[str | None, str | None]:
     """
     Connect to an OSH node, optionally restoring sims from the local datastore.
     Returns (node_id, None) on success or (None, error_message) on failure.
@@ -130,11 +156,9 @@ def connect(protocol: str, host: str, port: int, username: str, password: str,
         osh.discover_datastreams()
         osh.save_config()
 
-        # Start a dedicated monitor MQTT client for this node
-        bridge.start_monitor(node_id, host, username=username, password=password)
-
-        # Subscribe to all topics so we can detect external devices automatically
-        bridge.subscribe_topic(node_id, "#")
+        # Bind the bridge to this node's oshconnect MQTT client.
+        # attach_node also subscribes to "#" so external-device discovery sees everything.
+        bridge.attach_node(node_id, node)
 
         # Register hook for external device auto-discovery
         _external_devices[node_id] = {}
@@ -435,7 +459,7 @@ def disconnect(node_id: str) -> tuple[bool, str | None]:
                 except Exception:
                     pass
         sim_registry.remove_for_node(node_id)
-        bridge.stop_monitor(node_id)   # also clears the message hook
+        bridge.detach_node(node_id)   # also clears the message hook
         _external_devices.pop(node_id, None)
         _known_obs_topics.pop(node_id, None)
     except Exception as e:

@@ -1,0 +1,97 @@
+# =============================================================================
+# OCSASim Development Stack
+#
+# Prerequisites:
+#   Local PyPI must be running (lives in OSHConnect-Python):
+#     cd ../OSHConnect-Python && docker compose up -d
+#     ./scripts/publish-local.sh
+#
+# Usage:
+#   docker compose up -d                     # start 2 OSH nodes
+#   docker compose up -d --scale osh-node=3  # start 3 nodes (ports auto-assigned)
+#   docker compose down -v                   # tear down + remove volumes
+# =============================================================================
+
+services:
+
+  # ── OSH Node 1 (fixed ports for primary testing) ──────────────────────────
+  osh-node-1:
+    build:
+      context: ./docker/osh-node
+      dockerfile: Dockerfile
+    container_name: osh-node-1
+    ports:
+      - "8282:8282"   # HTTP API (Connected Systems)
+      - "1883:1883"   # MQTT broker (embedded HiveMQ)
+      - "8181:8181"   # Admin UI (optional)
+    volumes:
+      - osh-node-1-data:/opt/osh-node/db
+    environment:
+      - OSH_NODE_NAME=osh-node-1
+      - JAVA_OPTS=-Xmx512m
+    networks:
+      - osh-net
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8282/sensorhub/api/systems"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
+
+  # ── OSH Node 2 (offset ports) ────────────────────────────────────────────
+  osh-node-2:
+    build:
+      context: ./docker/osh-node
+      dockerfile: Dockerfile
+    container_name: osh-node-2
+    ports:
+      - "8382:8282"   # HTTP API on host port 8382
+      - "1984:1883"   # MQTT on host port 1984
+      - "8281:8181"   # Admin UI on host port 8281
+    volumes:
+      - osh-node-2-data:/opt/osh-node/db
+    environment:
+      - OSH_NODE_NAME=osh-node-2
+      - JAVA_OPTS=-Xmx512m
+    networks:
+      - osh-net
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8282/sensorhub/api/systems"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
+
+  # ── Scalable OSH Nodes (use --scale osh-node=N) ──────────────────────────
+  # Ports are NOT fixed — use `docker compose port osh-node <N> 8282` to find them.
+  # Useful for load/multi-node federation tests.
+  osh-node:
+    build:
+      context: ./docker/osh-node
+      dockerfile: Dockerfile
+    ports:
+      - "8282"    # random host port → container 8282
+      - "1883"    # random host port → container 1883
+    volumes:
+      - osh-node-shared-data:/opt/osh-node/db
+    environment:
+      - JAVA_OPTS=-Xmx512m
+    networks:
+      - osh-net
+    profiles:
+      - scale     # only starts with: docker compose --profile scale up --scale osh-node=N
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8282/sensorhub/api/systems"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
+
+networks:
+  osh-net:
+    driver: bridge
+
+volumes:
+  osh-node-1-data:
+  osh-node-2-data:
+  osh-node-shared-data:

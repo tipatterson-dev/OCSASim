@@ -4,6 +4,13 @@ import threading
 
 import paho.mqtt.client as mqtt
 
+from oshconnect import Node
+from oshconnect.csapi4py.mqtt import MQTTCommClient
+
+# These class-level patches affect every paho.Client in the process,
+# including the one inside oshconnect's MQTTCommClient — so they still apply
+# after this bridge stopped owning its own paho.Client.
+#
 # paho-mqtt 2.x's Client.__del__ reaches self._sock without a hasattr guard,
 # raising AttributeError on Python 3.14 during interpreter shutdown after the
 # loop thread is torn down. Wrap the finalizer to swallow that spurious error.
@@ -20,12 +27,17 @@ def _paho_safe_del(self):
 mqtt.Client.__del__ = _paho_safe_del
 
 # A paho Client wraps a live socket, which `socket.__getstate__` refuses to
-# pickle. oshconnect's EventBuilder.build() calls `event.model_copy(deep=True)`
-# on events whose data field is a Node — that walks the Node graph into the
-# Client and hits the socket. Treat the Client as a singleton resource that
-# aliases on copy/deepcopy so the walk stops at the boundary.
+# pickle. Treat the Client as a singleton resource that aliases on copy/deepcopy
+# so any deep-copy walk that lands on a Client stops at the boundary.
 mqtt.Client.__deepcopy__ = lambda self, memo=None: self
 mqtt.Client.__copy__ = lambda self: self
+
+# oshconnect's EventBuilder.build() calls `event.model_copy(deep=True)` on
+# events whose data/producer fields hold the live Node + OSHConnect graph —
+# Node → MQTTCommClient → paho.Client → socket, and OSHConnect → DataStore →
+# sqlite3.Connection. Both contain unpicklable system resources, so deepcopy
+# fails. Subscribers receive in-process objects and expect identity to be
+# preserved across publish, so a shallow copy is the correct semantic.
 
 
 logger = logging.getLogger(__name__)
@@ -36,10 +48,10 @@ class MQTTBridge:
         self._loop: asyncio.AbstractEventLoop | None = None
         self._queue: asyncio.Queue | None = None
         self._clients: set = set()
-        self._monitors: dict[str, mqtt.Client] = {}     # node_id -> paho.Client
-        self._subscriptions: dict[str, set[str]] = {}   # node_id -> {topics}
+        self._monitors: dict[str, MQTTCommClient] = {}    # node_id -> oshconnect MQTT client
+        self._subscriptions: dict[str, set[str]] = {}     # node_id -> {topics}
         self._lock = threading.Lock()
-        self._hooks: dict[str, callable] = {}            # node_id -> callback(node_id, topic, payload)
+        self._hooks: dict[str, callable] = {}             # node_id -> callback(node_id, topic, payload)
 
     def attach_loop(self, loop: asyncio.AbstractEventLoop):
         self._loop = loop
@@ -47,75 +59,52 @@ class MQTTBridge:
 
     # ── Monitor clients (one per connected node) ───────────────────────────
 
-    def start_monitor(self, node_id: str, host: str, port: int = 1883,
-                      username: str = None, password: str = None):
-        """Start (or restart) the MQTT monitor client for *node_id*."""
-        with self._lock:
-            old = self._monitors.get(node_id)
-            if old is not None:
-                try:
-                    old.loop_stop()
-                    old.disconnect()
-                except Exception:
-                    pass
-
-            client = mqtt.Client(
-                mqtt.CallbackAPIVersion.VERSION2,
-                client_id=f"ocsa-bridge-{node_id}",
+    def attach_node(self, node_id: str, node: Node) -> None:
+        """Bind *node*'s oshconnect MQTT client to *node_id* and start monitoring all topics."""
+        mqtt_client = node.get_mqtt_client()
+        if mqtt_client is None:
+            raise RuntimeError(
+                f"Node {node_id} has no MQTT client — Node must be created with enable_mqtt=True"
             )
-            # Pass node_id via userdata so callbacks can identify the source
-            client.user_data_set(node_id)
-            if username and password:
-                client.username_pw_set(username, password)
 
-            client.on_connect = self._on_monitor_connect
-            client.on_message = self._on_monitor_message
-
+        with self._lock:
+            self._monitors[node_id] = mqtt_client
             if node_id not in self._subscriptions:
                 self._subscriptions[node_id] = set()
 
-            self._monitors[node_id] = client
+        # Subscribe to everything as a per-topic ("#") filtered callback. paho 2.x
+        # calls every matching filtered callback, so this fires *alongside* the
+        # per-topic callbacks oshconnect's Datastream/ControlStream register when
+        # they start in BIDIRECTIONAL mode. Using set_on_message() instead would
+        # be shadowed by those per-topic registrations and miss observation/command
+        # messages on the shared client.
+        # Bind node_id via closure since paho's callback signature has no per-call userdata.
+        mqtt_client.subscribe(
+            "#", qos=0,
+            msg_callback=lambda c, u, msg: self._on_global_message(node_id, msg),
+        )
+        with self._lock:
+            self._subscriptions[node_id].add("#")
+        logger.info("MQTT monitor [%s] attached to oshconnect client; subscribed to #", node_id)
 
-        try:
-            client.connect(host, port)
-            client.loop_start()
-            logger.info("MQTT monitor [%s] started → %s:%s", node_id, host, port)
-        except Exception as exc:
-            with self._lock:
-                self._monitors.pop(node_id, None)
-            logger.error("MQTT monitor [%s] connect failed: %s", node_id, exc)
-            raise
-
-    def stop_monitor(self, node_id: str):
-        """Stop and remove the MQTT monitor client for *node_id*."""
+    def detach_node(self, node_id: str) -> None:
+        """Stop tracking *node_id*. Does NOT disconnect the underlying client — the Node owns it."""
         with self._lock:
             client = self._monitors.pop(node_id, None)
-            self._subscriptions.pop(node_id, None)
+            topics = self._subscriptions.pop(node_id, set())
         self._hooks.pop(node_id, None)
         if client is not None:
-            try:
-                client.loop_stop()
-                client.disconnect()
-                logger.info("MQTT monitor [%s] stopped", node_id)
-            except Exception as e:
-                logger.warning("Error stopping MQTT monitor [%s]: %s", node_id, e)
-
-    def _on_monitor_connect(self, client, userdata, flags, rc, properties):
-        node_id = userdata
-        if rc == mqtt.MQTT_ERR_SUCCESS:
-            logger.info("MQTT monitor [%s] connected", node_id)
-            with self._lock:
-                topics = set(self._subscriptions.get(node_id, []))
             for topic in topics:
-                client.subscribe(topic, qos=0)
-                logger.debug("MQTT monitor [%s] re-subscribed to %s", node_id, topic)
-        else:
-            logger.error("MQTT monitor [%s] connection failed rc=%s", node_id, rc)
+                try:
+                    client.unsubscribe(topic)
+                except Exception as e:
+                    logger.warning("Error unsubscribing [%s] %s: %s", node_id, topic, e)
+            logger.info("MQTT monitor [%s] detached", node_id)
 
-    def _on_monitor_message(self, client, userdata, msg):
-        """Called from paho's I/O thread — push onto the asyncio queue."""
-        node_id = userdata
+    def _on_global_message(self, node_id: str, msg) -> None:
+        """Called from paho's I/O thread (via oshconnect's MQTTCommClient) — push onto the asyncio queue."""
         payload_str = msg.payload.decode("utf-8", errors="replace")
+        logger.info("MQTT in [%s] %s %d bytes", node_id, msg.topic, len(msg.payload))
         payload = {
             "node_id": node_id,
             "topic": msg.topic,
