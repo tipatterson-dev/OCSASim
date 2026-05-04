@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OCSASim Builder</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #0f1117;
+    color: #e2e8f0;
+    display: grid;
+    grid-template-rows: auto 1fr;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 24px;
+    background: #161b27;
+    border-bottom: 1px solid #2d3748;
+  }
+  header h1 { font-size: 1.1rem; font-weight: 600; letter-spacing: 0.03em; }
+  .back-link {
+    font-size: 0.82rem; color: #7c3aed; text-decoration: none;
+    padding: 4px 10px; border: 1px solid #4c1d95; border-radius: 5px;
+    margin-left: auto;
+  }
+  .back-link:hover { background: #2e1065; }
+
+  /* ── Two-panel layout ── */
+  .workspace {
+    display: grid;
+    grid-template-columns: 420px 1fr;
+    overflow: hidden;
+  }
+
+  /* ── Left: Create form ── */
+  #create-panel {
+    border-right: 1px solid #2d3748;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  #create-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 20px 0;
+  }
+  #create-footer {
+    padding: 14px 20px;
+    border-top: 1px solid #2d3748;
+    background: #0f1117;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+
+  /* ── Right: Sims list ── */
+  #sims-panel {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 20px 24px 0;
+  }
+  #sims-scroll { flex: 1; overflow-y: auto; padding-bottom: 16px; }
+
+  /* ── Section headings ── */
+  .section-title {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #64748b;
+    margin-bottom: 14px;
+  }
+
+  /* ── Form elements ── */
+  label.field-label {
+    display: block;
+    font-size: 0.7rem;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+  }
+
+  input[type="text"], input[type="number"], select, textarea {
+    width: 100%;
+    background: #1e2535;
+    border: 1px solid #374151;
+    border-radius: 5px;
+    color: #e2e8f0;
+    padding: 6px 9px;
+    font-size: 0.85rem;
+  }
+  input[type="text"]:focus, input[type="number"]:focus, select:focus {
+    outline: none;
+    border-color: #7c3aed;
+  }
+  select option { background: #1e2535; }
+
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .form-row.three { grid-template-columns: 1fr 1fr 1fr; }
+  .form-group { margin-bottom: 12px; }
+
+  /* ── Buttons ── */
+  button {
+    border-radius: 6px; border: none; font-size: 0.82rem;
+    font-weight: 500; cursor: pointer; transition: opacity 0.15s;
+    padding: 7px 14px;
+  }
+  button:disabled { opacity: 0.4; cursor: default; }
+  button:hover:not(:disabled) { opacity: 0.85; }
+
+  .btn-primary   { background: #7c3aed; color: #fff; }
+  .btn-secondary { background: #1e2535; color: #94a3b8; border: 1px solid #2d3748; }
+  .btn-add-field { background: #1a2030; color: #7c3aed; border: 1px solid #4c1d95; width: 100%; margin-bottom: 14px; }
+  .btn-danger    { background: transparent; border: none; color: #6b7280; font-size: 0.75rem; padding: 2px 6px; }
+  .btn-danger:hover:not(:disabled) { color: #f87171; opacity: 1; }
+
+  /* ── Dividers ── */
+  .divider {
+    border: none;
+    border-top: 1px solid #2d3748;
+    margin: 16px 0;
+  }
+
+  /* ── Node selector ── */
+  #node-select-wrap {
+    background: #161b27;
+    border: 1px solid #2d3748;
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin-bottom: 16px;
+  }
+
+  /* ── Field cards ── */
+  .field-card {
+    background: #161b27;
+    border: 1px solid #2d3748;
+    border-radius: 7px;
+    padding: 12px;
+    margin-bottom: 10px;
+    position: relative;
+  }
+  .field-card-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .field-index {
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: #4c1d95;
+    color: #c4b5fd;
+    font-size: 0.65rem;
+    font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .field-card-title { font-size: 0.8rem; font-weight: 600; flex: 1; color: #c4b5fd; }
+
+  /* behavior params – shown/hidden by JS */
+  .beh-params { display: none; }
+  .beh-params.visible { display: block; }
+
+  /* ── Checkbox row ── */
+  .check-row { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+  .check-row input { width: auto; }
+  .check-row label { font-size: 0.82rem; color: #94a3b8; }
+
+  /* ── Error / status messages ── */
+  #create-status {
+    font-size: 0.78rem;
+    flex: 1;
+  }
+  .status-ok  { color: #4ade80; }
+  .status-err { color: #f87171; }
+
+  /* ── Custom sim cards (right panel) ── */
+  .csim-card {
+    background: #161b27;
+    border: 1px solid #2d3748;
+    border-radius: 8px;
+    padding: 14px;
+    margin-bottom: 12px;
+  }
+  .csim-header {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 10px;
+  }
+  .csim-name { font-weight: 600; font-size: 0.95rem; flex: 1; }
+  .csim-node-tag {
+    font-size: 0.62rem; color: #4b5563; background: #0f1117;
+    border: 1px solid #2d3748; border-radius: 4px; padding: 1px 5px;
+    font-family: monospace;
+  }
+  .csim-fields {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(120px,1fr));
+    gap: 6px; margin-top: 8px;
+  }
+  .csim-field-chip {
+    background: #0f1117; border: 1px solid #2d3748;
+    border-radius: 5px; padding: 5px 8px;
+  }
+  .csim-field-label { font-size: 0.7rem; color: #94a3b8; }
+  .csim-field-meta  { font-size: 0.65rem; color: #4b5563; }
+
+  .empty-msg { color: #4b5563; font-size: 0.85rem; font-style: italic; }
+
+  /* ── No nodes warning ── */
+  #no-nodes-warning {
+    display: none;
+    background: #1a1a0f;
+    border: 1px solid #713f12;
+    color: #fbbf24;
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-size: 0.82rem;
+    margin-bottom: 14px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>OCSASim — Simulator Builder</h1>
+  <a class="back-link" href="/">&#8592; Dashboard</a>
+</header>
+
+<div class="workspace">
+
+  <!-- ── Left: Create form ──────────────────────────────────── -->
+  <div id="create-panel">
+    <div id="create-scroll">
+
+      <div class="section-title">New Simulator</div>
+
+      <!-- Node selector -->
+      <div id="node-select-wrap">
+        <label class="field-label">Target Node</label>
+        <select id="node-select"></select>
+      </div>
+      <div id="no-nodes-warning">
+        No nodes connected. Go to the <a href="/" style="color:#f59e0b;">Dashboard</a> and connect a node first.
+      </div>
+
+      <!-- Sim metadata -->
+      <div class="form-row">
+        <div class="form-group" style="margin-bottom:0">
+          <label class="field-label">Label</label>
+          <input type="text" id="sim-label" placeholder="My Sensor">
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="field-label">Interval (s)</label>
+          <input type="number" id="sim-interval" value="5" min="0.1" step="0.5">
+        </div>
+      </div>
+      <div class="form-group" style="margin-top:10px;">
+        <label class="field-label">Description (optional)</label>
+        <input type="text" id="sim-description" placeholder="Brief description of what this simulates">
+      </div>
+
+      <hr class="divider">
+      <div class="section-title">Fields</div>
+
+      <div id="fields-list"></div>
+      <button class="btn-add-field" onclick="addField()">+ Add Field</button>
+
+    </div><!-- /create-scroll -->
+
+    <div id="create-footer">
+      <button class="btn-primary" id="btn-create" onclick="createSim()">Create Simulator</button>
+      <span id="create-status"></span>
+    </div>
+  </div>
+
+  <!-- ── Right: Existing custom sims ───────────────────────── -->
+  <div id="sims-panel">
+    <div class="section-title">Custom Simulators</div>
+    <div id="sims-scroll">
+      <div id="csims-list">
+        <span class="empty-msg">No custom simulators yet.</span>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /workspace -->
+
+<script>
+// ── Behavior definitions ───────────────────────────────────────────────────
+const BEHAVIORS = {
+  Quantity: [
+    { value: 'static',      label: 'Static'       },
+    { value: 'random',      label: 'Random'       },
+    { value: 'sine',        label: 'Sine Wave'    },
+    { value: 'ramp',        label: 'Ramp'         },
+    { value: 'random_walk', label: 'Random Walk'  },
+  ],
+  Count: [
+    { value: 'static',  label: 'Static'  },
+    { value: 'counter', label: 'Counter' },
+    { value: 'random',  label: 'Random'  },
+  ],
+  Boolean: [
+    { value: 'static', label: 'Static' },
+    { value: 'toggle', label: 'Toggle' },
+    { value: 'random', label: 'Random' },
+  ],
+};
+
+// Params HTML per behavior key  (injected into .beh-params div)
+function behaviorParamsHtml(beh, ft, idx) {
+  const p = `f${idx}`;
+  if (beh === 'static') {
+    if (ft === 'Boolean') return `
+      <div class="check-row">
+        <input type="checkbox" id="${p}-val">
+        <label for="${p}-val">Initial value = true</label>
+      </div>`;
+    const label = ft === 'Count' ? 'Value (integer)' : 'Value';
+    return `<div class="form-group" style="margin-bottom:0">
+      <label class="field-label">${label}</label>
+      <input type="number" id="${p}-val" value="0" ${ft==='Count'?'step="1"':''}>
+    </div>`;
+  }
+  if (beh === 'random') {
+    if (ft === 'Boolean') return `<div style="font-size:0.75rem;color:#4b5563;">Randomly true or false each tick.</div>`;
+    return `<div class="form-row">
+      <div><label class="field-label">Min</label><input type="number" id="${p}-min" value="0"></div>
+      <div><label class="field-label">Max</label><input type="number" id="${p}-max" value="100"></div>
+    </div>`;
+  }
+  if (beh === 'sine') return `
+    <div class="form-row three">
+      <div><label class="field-label">Min</label><input type="number" id="${p}-min" value="0"></div>
+      <div><label class="field-label">Max</label><input type="number" id="${p}-max" value="100"></div>
+      <div><label class="field-label">Period (s)</label><input type="number" id="${p}-period" value="60" min="1"></div>
+    </div>`;
+  if (beh === 'ramp') return `
+    <div class="form-row three">
+      <div><label class="field-label">Min</label><input type="number" id="${p}-min" value="0"></div>
+      <div><label class="field-label">Max</label><input type="number" id="${p}-max" value="100"></div>
+      <div><label class="field-label">Step</label><input type="number" id="${p}-step" value="1"></div>
+    </div>`;
+  if (beh === 'random_walk') return `
+    <div class="form-row three">
+      <div><label class="field-label">Min</label><input type="number" id="${p}-min" value="0"></div>
+      <div><label class="field-label">Max</label><input type="number" id="${p}-max" value="100"></div>
+      <div><label class="field-label">Step ±</label><input type="number" id="${p}-step" value="2"></div>
+    </div>`;
+  if (beh === 'counter') return `
+    <div class="form-row">
+      <div><label class="field-label">Start</label><input type="number" id="${p}-start" value="0" step="1"></div>
+      <div><label class="field-label">Step</label><input type="number" id="${p}-step" value="1" step="1"></div>
+    </div>
+    <div class="form-row">
+      <div><label class="field-label">Min</label><input type="number" id="${p}-min" value="0" step="1"></div>
+      <div><label class="field-label">Max</label><input type="number" id="${p}-max" value="100" step="1"></div>
+    </div>
+    <div class="check-row">
+      <input type="checkbox" id="${p}-cd">
+      <label for="${p}-cd">Count down</label>
+    </div>`;
+  if (beh === 'toggle') return `<div style="font-size:0.75rem;color:#4b5563;">Alternates true / false each tick.</div>`;
+  return '';
+}
+
+// ── Field card builder ─────────────────────────────────────────────────────
+let fieldCount = 0;
+
+function toLowerCamel(s) {
+  return s.trim().toLowerCase()
+    .replace(/[^a-z0-9\s_]/g, '')
+    .replace(/[\s_]+(.)/g, (_, c) => c.toUpperCase());
+}
+
+function addField(preset = null) {
+  const idx  = fieldCount++;
+  const card = document.createElement('div');
+  card.className = 'field-card';
+  card.id = `field-${idx}`;
+
+  const ft  = preset?.type     || 'Quantity';
+  const beh = preset?.behavior || 'random';
+
+  card.innerHTML = `
+    <div class="field-card-header">
+      <span class="field-index">${idx + 1}</span>
+      <span class="field-card-title" id="fcard-title-${idx}">Field ${idx + 1}</span>
+      <button class="btn-danger" onclick="removeField(${idx})" title="Remove field">✕</button>
+    </div>
+    <div class="form-row">
+      <div>
+        <label class="field-label">Label</label>
+        <input type="text" id="f${idx}-label" placeholder="e.g. Temperature"
+               oninput="syncName(${idx})" value="${escHtml(preset?.label||'')}">
+      </div>
+      <div>
+        <label class="field-label">Name (key)</label>
+        <input type="text" id="f${idx}-name" placeholder="e.g. temperature"
+               value="${escHtml(preset?.name||'')}">
+      </div>
+    </div>
+    <div class="form-row">
+      <div>
+        <label class="field-label">Type</label>
+        <select id="f${idx}-type" onchange="onTypeChange(${idx})">
+          <option value="Quantity" ${ft==='Quantity'?'selected':''}>Quantity (decimal)</option>
+          <option value="Count"    ${ft==='Count'   ?'selected':''}>Count (integer)</option>
+          <option value="Boolean"  ${ft==='Boolean' ?'selected':''}>Boolean (true/false)</option>
+        </select>
+      </div>
+      <div id="f${idx}-unit-wrap">
+        <label class="field-label">Unit (UCUM)</label>
+        <input type="text" id="f${idx}-unit" placeholder="e.g. Cel, m/s, %" value="${escHtml(preset?.unit||'')}">
+      </div>
+    </div>
+    <div class="form-group" style="margin-bottom:8px;">
+      <label class="field-label">Behavior</label>
+      <select id="f${idx}-behavior" onchange="onBehChange(${idx})"></select>
+    </div>
+    <div class="beh-params" id="f${idx}-beh-params"></div>
+  `;
+
+  document.getElementById('fields-list').appendChild(card);
+  populateBehaviors(idx, ft, beh);
+  updateUnitVisibility(idx, ft);
+}
+
+function syncName(idx) {
+  const label = document.getElementById(`f${idx}-label`).value;
+  const nameEl = document.getElementById(`f${idx}-name`);
+  if (!nameEl._touched) nameEl.value = toLowerCamel(label);
+  document.getElementById(`fcard-title-${idx}`).textContent = label || `Field ${idx + 1}`;
+}
+
+// Mark name as manually touched so auto-sync stops
+document.addEventListener('input', e => {
+  if (e.target?.id?.match(/^f\d+-name$/)) e.target._touched = true;
+});
+
+function removeField(idx) {
+  const card = document.getElementById(`field-${idx}`);
+  if (card) card.remove();
+}
+
+function onTypeChange(idx) {
+  const ft = document.getElementById(`f${idx}-type`).value;
+  updateUnitVisibility(idx, ft);
+  populateBehaviors(idx, ft, null);
+}
+
+function updateUnitVisibility(idx, ft) {
+  const wrap = document.getElementById(`f${idx}-unit-wrap`);
+  if (wrap) wrap.style.display = ft === 'Quantity' ? '' : 'none';
+}
+
+function populateBehaviors(idx, ft, selectedBeh) {
+  const sel = document.getElementById(`f${idx}-behavior`);
+  sel.innerHTML = '';
+  for (const b of (BEHAVIORS[ft] || [])) {
+    const opt = document.createElement('option');
+    opt.value = b.value;
+    opt.textContent = b.label;
+    if (b.value === selectedBeh) opt.selected = true;
+    sel.appendChild(opt);
+  }
+  renderBehParams(idx);
+}
+
+function onBehChange(idx) { renderBehParams(idx); }
+
+function renderBehParams(idx) {
+  const ft  = document.getElementById(`f${idx}-type`)?.value;
+  const beh = document.getElementById(`f${idx}-behavior`)?.value;
+  const div = document.getElementById(`f${idx}-beh-params`);
+  if (!div) return;
+  div.innerHTML = behaviorParamsHtml(beh, ft, idx);
+  div.classList.add('visible');
+}
+
+// ── Read field spec from DOM ────────────────────────────────────────────────
+function readField(idx) {
+  const label = document.getElementById(`f${idx}-label`)?.value?.trim();
+  const name  = document.getElementById(`f${idx}-name`)?.value?.trim();
+  const ft    = document.getElementById(`f${idx}-type`)?.value;
+  const beh   = document.getElementById(`f${idx}-behavior`)?.value;
+  if (!label || !name) return null;
+
+  const p  = `f${idx}`;
+  const f  = { label, name, type: ft, behavior: beh };
+  if (ft === 'Quantity') f.unit = document.getElementById(`${p}-unit`)?.value?.trim() || '1';
+
+  const num = id => { const el = document.getElementById(id); return el ? parseFloat(el.value) : undefined; };
+  const chk = id => { const el = document.getElementById(id); return el ? el.checked : false; };
+
+  if (beh === 'static') {
+    if (ft === 'Boolean') f.value = chk(`${p}-val`);
+    else f.value = num(`${p}-val`) ?? 0;
+  } else if (beh === 'random') {
+    if (ft !== 'Boolean') { f.min = num(`${p}-min`) ?? 0; f.max = num(`${p}-max`) ?? 100; }
+  } else if (beh === 'sine') {
+    f.min = num(`${p}-min`) ?? 0; f.max = num(`${p}-max`) ?? 100;
+    f.period = num(`${p}-period`) ?? 60;
+  } else if (beh === 'ramp' || beh === 'random_walk') {
+    f.min = num(`${p}-min`) ?? 0; f.max = num(`${p}-max`) ?? 100;
+    f.step = num(`${p}-step`) ?? 1;
+  } else if (beh === 'counter') {
+    f.start = num(`${p}-start`) ?? 0; f.step = num(`${p}-step`) ?? 1;
+    f.min = num(`${p}-min`) ?? 0; f.max = num(`${p}-max`) ?? 100;
+    f.count_down = chk(`${p}-cd`);
+  }
+  return f;
+}
+
+// ── Create simulator ────────────────────────────────────────────────────────
+async function createSim() {
+  const statusEl = document.getElementById('create-status');
+  const btn      = document.getElementById('btn-create');
+  statusEl.textContent = '';
+
+  const nodeId   = document.getElementById('node-select').value;
+  const simLabel = document.getElementById('sim-label').value.trim();
+  const interval = parseFloat(document.getElementById('sim-interval').value) || 5;
+  const desc     = document.getElementById('sim-description').value.trim();
+
+  if (!nodeId) { statusEl.className = 'status-err'; statusEl.textContent = 'Select a node first.'; return; }
+  if (!simLabel) { statusEl.className = 'status-err'; statusEl.textContent = 'Enter a simulator label.'; return; }
+
+  const cards = document.querySelectorAll('.field-card');
+  const fields = [];
+  for (const card of cards) {
+    const idx = parseInt(card.id.replace('field-', ''));
+    const f   = readField(idx);
+    if (!f) { statusEl.className = 'status-err'; statusEl.textContent = `Field ${idx + 1}: label and name are required.`; return; }
+    if (fields.some(x => x.name === f.name)) { statusEl.className = 'status-err'; statusEl.textContent = `Duplicate field name "${f.name}".`; return; }
+    fields.push(f);
+  }
+  if (fields.length === 0) { statusEl.className = 'status-err'; statusEl.textContent = 'Add at least one field.'; return; }
+
+  const spec = { label: simLabel, description: desc, interval, fields };
+
+  btn.disabled = true;
+  btn.textContent = 'Creating…';
+  try {
+    const res = await fetch(`/api/nodes/${nodeId}/sims`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(spec),
+    });
+    if (res.ok) {
+      const { sim_name } = await res.json();
+      statusEl.className = 'status-ok';
+      statusEl.textContent = `Created "${simLabel}" (${sim_name})`;
+      clearForm();
+      await refreshCustomSims();
+    } else {
+      const detail = (await res.json()).detail || 'Unknown error';
+      statusEl.className = 'status-err';
+      statusEl.textContent = detail;
+    }
+  } catch (e) {
+    statusEl.className = 'status-err';
+    statusEl.textContent = String(e);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Create Simulator';
+  }
+}
+
+function clearForm() {
+  document.getElementById('sim-label').value = '';
+  document.getElementById('sim-description').value = '';
+  document.getElementById('sim-interval').value = '5';
+  document.getElementById('fields-list').innerHTML = '';
+  fieldCount = 0;
+}
+
+// ── Node selector ────────────────────────────────────────────────────────────
+async function loadNodes() {
+  const sel     = document.getElementById('node-select');
+  const warning = document.getElementById('no-nodes-warning');
+  try {
+    const nodes = await fetch('/api/nodes').then(r => r.json());
+    sel.innerHTML = '';
+    const entries = Object.entries(nodes);
+    if (entries.length === 0) {
+      warning.style.display = 'block';
+      sel.parentElement.style.display = 'none';
+    } else {
+      warning.style.display = 'none';
+      sel.parentElement.style.display = 'block';
+      for (const [nid, state] of entries) {
+        const opt = document.createElement('option');
+        opt.value = nid;
+        opt.textContent = `${state.host}:${state.port}  (${nid})`;
+        sel.appendChild(opt);
+      }
+    }
+  } catch { /* ignore */ }
+}
+
+// ── Custom sims list (right panel) ──────────────────────────────────────────
+const BEHAVIOR_LABELS = {
+  static: 'Static', random: 'Random', sine: 'Sine', ramp: 'Ramp',
+  random_walk: 'Walk', counter: 'Counter', toggle: 'Toggle',
+};
+
+async function refreshCustomSims() {
+  const list = document.getElementById('csims-list');
+  try {
+    const nodes = await fetch('/api/nodes').then(r => r.json());
+    const cards = [];
+    for (const [nid, state] of Object.entries(nodes)) {
+      const sims = await fetch(`/api/nodes/${nid}/sims`).then(r => r.json());
+      for (const [sname, sim] of Object.entries(sims)) {
+        if (sim.type !== 'CustomSim') continue;
+        cards.push(buildCSimCard(nid, state, sname, sim));
+      }
+    }
+    if (cards.length === 0) {
+      list.innerHTML = '<span class="empty-msg">No custom simulators yet.</span>';
+    } else {
+      list.innerHTML = '';
+      cards.forEach(c => list.appendChild(c));
+    }
+  } catch { /* ignore */ }
+}
+
+function buildCSimCard(nodeId, nodeState, simName, sim) {
+  const card = document.createElement('div');
+  card.className = 'csim-card';
+
+  const spec = sim.spec || {};
+  const fields = spec.fields || [];
+
+  card.innerHTML = `
+    <div class="csim-header">
+      <span class="csim-name">${escHtml(sim.name)}</span>
+      <span style="font-size:0.72rem;color:#4b5563;">${escHtml(spec.label || sim.name)}</span>
+      <span class="csim-node-tag">${escHtml(nodeState.host)}:${escHtml(String(nodeState.port))}</span>
+    </div>
+    <div style="font-size:0.72rem;color:#4b5563;margin-bottom:8px;">
+      ${fields.length} field${fields.length !== 1 ? 's' : ''} · every ${spec.interval ?? 5}s
+      ${spec.description ? ' · ' + escHtml(spec.description) : ''}
+    </div>
+    <div class="csim-fields">
+      ${fields.map(f => `
+        <div class="csim-field-chip">
+          <div class="csim-field-label">${escHtml(f.label || f.name)}</div>
+          <div class="csim-field-meta">${escHtml(f.type)}${f.unit ? ' · ' + escHtml(f.unit) : ''} · ${escHtml(BEHAVIOR_LABELS[f.behavior] || f.behavior)}</div>
+        </div>`).join('')}
+    </div>`;
+  return card;
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+async function init() {
+  await loadNodes();
+  await refreshCustomSims();
+
+  // Seed an example field to guide the user
+  if (document.querySelectorAll('.field-card').length === 0) {
+    addField({ label: 'Temperature', name: 'temperature', type: 'Quantity', unit: 'Cel', behavior: 'sine' });
+  }
+}
+
+init();
+
+// Refresh sims list every 5 s
+setInterval(refreshCustomSims, 5000);
+</script>
+</body>
+</html>

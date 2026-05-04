@@ -1,0 +1,16 @@
+{
+  "nodes": {
+    "local": {
+      "host": "localhost",
+      "port": 8282,
+      "mqtt_port": 1883,
+      "user": "admin",
+      "password": "admin",
+      "sims": [
+        {"kind": "counter", "name": "fast", "params": {"step": 1, "upper_bound": 50}},
+        {"kind": "counter", "name": "slow", "params": {"step": 20}},
+        {"kind": "lob",     "name": "lob_a", "params": {"interval": 0.5, "angle_step": 5}}
+      ]
+    }
+  }
+}

@@ -1,0 +1,34 @@
+# Build context lives at the project root for the sim image. Keep it small
+# by excluding everything the sim runner doesn't need.
+
+# Local virtualenvs and caches — uv recreates them inside the image.
+.venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Web UI state and SQLite DB belong on the host, not in the image.
+OCSASim_data.db
+OCSASim_config.json
+
+# Stress harness output — large, irrelevant to the sim image.
+stress/logs/
+
+# Docker artifacts in the context confuse layer caching.
+docker/
+docker-compose*.yml
+
+# IDE / editor / OS noise.
+.idea/
+.vscode/
+.DS_Store
+
+# Git internals.
+.git/
+.gitignore
+
+# Plans / scratch.
+CLAUDE.md

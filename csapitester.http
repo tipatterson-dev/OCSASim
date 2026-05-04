@@ -65,7 +65,7 @@ Authorization: Basic YWRtaW46YWRtaW4=
 
 ###
 
-POST http://localhost:8282/sensorhub/api/controlstreams/027eljmqhd40/commands
+POST http://localhost:8282/sensorhub/api/controlstreams/02bqt54qhs40/commands
 Content-Type: application/json
 Authorization: Basic YWRtaW46YWRtaW4=
 
@@ -79,7 +79,7 @@ Authorization: Basic YWRtaW46YWRtaW4=
 }
 
 ###
-POST http://localhost:8282/sensorhub/api/controlstreams/027eljmqhd40/commands
+POST http://localhost:8282/sensorhub/api/controlstreams/02bqt54qhs40/commands:data
 Content-Type: application/json
 Authorization: Basic YWRtaW46YWRtaW4=
 
