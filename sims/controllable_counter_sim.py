@@ -35,7 +35,9 @@ class ControllableCounterSim(Sim):
 
     def __init__(self, name: str, app: OSHConnect, node: Node):
         super().__init__(name, app, node)
-        self.count = self.lower_bound
+        # self.count is initialized inside count_func() so any setattr on
+        # lower_bound between construction and start() (e.g. via main.py's
+        # config loader) is honored on the first tick.
 
         self.ds_schema = DataRecordSchema(label="Controllable Counter",
                                           description="A simple controllable counter simulation",
@@ -109,6 +111,7 @@ class ControllableCounterSim(Sim):
         counter_t.join()
 
     def count_func(self):
+        self.count = self.lower_bound
         while self.should_simulate:
             self.count += self.step * self.step_sign
             match self.step_sign:
