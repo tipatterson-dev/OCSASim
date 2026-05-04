@@ -6,27 +6,26 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
-    "oshconnect>=0.4.0a0",
+    "oshconnect==0.5.1a0.dev9",
     "requests",
     "fastapi>=0.111",
     "uvicorn>=0.30",
     "websockets>=12.0",
 ]
 
-# ── Local PyPI index (default source for oshconnect) ───────────────────────
-# Start the dockerized local PyPI before `uv sync`:
-#     cd ../OSHConnect-Python && docker compose up -d
-#     ./scripts/publish-local.sh
+# ── oshconnect comes from test.pypi.org ────────────────────────────────────
+# `explicit = true` keeps test.pypi out of resolution for any other dep —
+# uv only consults it for packages pinned to this index in [tool.uv.sources].
 #
-# Opt out: to fall back to a local wheel instead of the local PyPI,
-# replace the [tool.uv.sources] block below with:
+# To fall back to a local wheel for development, replace this block with:
 #
 # [tool.uv.sources]
-# oshconnect = { path = "/Users/cr31/PycharmProjects/OSHConnect-Python/dist/oshconnect-0.4.0a0-py3-none-any.whl" }
+# oshconnect = { path = "/Users/cr31/PycharmProjects/OSHConnect-Python/dist/oshconnect-0.5.1a0.dev9-py3-none-any.whl" }
 
 [[tool.uv.index]]
-url = "http://localhost:8090/simple/"
-name = "local"
+url = "https://test.pypi.org/simple/"
+name = "testpypi"
+explicit = true
 
 [tool.uv.sources]
-oshconnect = { index = "local" }
+oshconnect = { index = "testpypi" }

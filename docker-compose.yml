@@ -1,29 +1,50 @@
 # =============================================================================
 # OCSASim Development Stack
 #
-# Prerequisites:
-#   Local PyPI must be running (lives in OSHConnect-Python):
-#     cd ../OSHConnect-Python && docker compose up -d
-#     ./scripts/publish-local.sh
+# First-time setup (and any time OSH source/branches change):
+#   docker compose --profile build build osh-builder    # ~5–10 min, gradle build
 #
-# Usage:
-#   docker compose up -d                     # start 2 OSH nodes
-#   docker compose up -d --scale osh-node=3  # start 3 nodes (ports auto-assigned)
-#   docker compose down -v                   # tear down + remove volumes
+# Day-to-day:
+#   docker compose up -d --build sim osh-node-1         # bring up sim + node 1
+#   docker compose logs -f sim                          # tail the sim's output
+#   docker compose down                                 # stop containers
+#   docker compose down -v                              # also drop the H2 db volume
+#
+# Other shapes:
+#   docker compose up -d osh-node-1 osh-node-2          # two nodes, no sim
+#   docker compose --profile scale up -d --scale osh-node=4
+#
+# The osh-builder service is profile=build so it never runs as a daemon —
+# `docker compose up` ignores it. It exists only to build & tag the local
+# image ocsasim/osh-builder:latest, which the osh-node Dockerfile copies from.
 # =============================================================================
 
 services:
 
+  # ── Build-only image: gradle build of OSH (slow, run on demand) ───────────
+  osh-builder:
+    build:
+      context: ./docker/osh-builder
+      dockerfile: Dockerfile
+    image: ocsasim/osh-builder:latest
+    profiles: [build]    # excluded from `docker compose up`
+    # No ports / volumes / networks — this image is never run, only consumed
+    # by `COPY --from=ocsasim/osh-builder:latest` in docker/osh-node/Dockerfile.
+
   # ── OSH Node 1 (fixed ports for primary testing) ──────────────────────────
+  # Host ports deliberately offset from OSH's defaults (8282/1883/8181) so a
+  # locally-installed OSH on the host doesn't fight this container for the
+  # well-known ports. Inside the container the standard ports are unchanged,
+  # so the sim service connects to "osh-node-1:8282" / ":1883" as usual.
   osh-node-1:
     build:
       context: ./docker/osh-node
       dockerfile: Dockerfile
     container_name: osh-node-1
     ports:
-      - "8282:8282"   # HTTP API (Connected Systems)
-      - "1883:1883"   # MQTT broker (embedded HiveMQ)
-      - "8181:8181"   # Admin UI (optional)
+      - "18282:8282"   # HTTP API (Connected Systems)
+      - "11883:1883"   # MQTT broker (embedded HiveMQ)
+      - "18181:8181"   # Admin UI (optional)
     volumes:
       - osh-node-1-data:/opt/osh-node/db
     environment:
@@ -86,6 +107,22 @@ services:
       timeout: 5s
       start_period: 30s
       retries: 5
+
+  # ── OCSASim sim runner ────────────────────────────────────────────────────
+  # Connects to osh-node-1 by service name. Override the mounted config to
+  # point at a different node or change which sims run.
+  sim:
+    build:
+      context: .
+      dockerfile: docker/sim/Dockerfile
+    container_name: ocsasim-sim
+    depends_on:
+      osh-node-1:
+        condition: service_healthy
+    volumes:
+      - ./examples/sim_config.docker.json:/config/sim_config.json:ro
+    networks:
+      - osh-net
 
 networks:
   osh-net:

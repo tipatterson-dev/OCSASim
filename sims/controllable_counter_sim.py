@@ -39,9 +39,6 @@ class ControllableCounterSim(Sim):
         # lower_bound between construction and start() (e.g. via main.py's
         # config loader) is honored on the first tick.
 
-        self.ds_schema = DataRecordSchema(label="Controllable Counter",
-                                          description="A simple controllable counter simulation",
-                                          definition="http://bottsinc.com/def/ControllableCounter", fields=[])
         timestamp = TimeSchema(label="Timestamp", name="timestamp", description="Timestamp of the GPS data",
                                definition="http://www.opengis.net/def/property/OGC/0/SamplingTime",
                                uom=URI(href="http://www.opengis.net/def/uom/ISO-8601/0/Gregorian"))
@@ -54,13 +51,15 @@ class ControllableCounterSim(Sim):
         upper_bound_schema = CountSchema(label="Upper Bound", name="upperBound",
                                          definition="http://bottsinc.com/def/UpperBound")
 
-        self.ds_schema.fields.extend(
-            [timestamp, counter_schema, count_down_schema, step_schema, lower_bound_schema, upper_bound_schema])
+        self.ds_schema = DataRecordSchema(
+            name="controllable_counter",
+            label="Controllable Counter",
+            description="A simple controllable counter simulation",
+            definition="http://bottsinc.com/def/ControllableCounter",
+            fields=[timestamp, counter_schema, count_down_schema, step_schema,
+                    lower_bound_schema, upper_bound_schema],
+        )
 
-        self.controlstream_schema = DataRecordSchema(label="Controllable Counter Control",
-                                                     description="Control stream for the controllable counter simulation",
-                                                     definition="http://bottsinc.com/def/ControllableCounterControl",
-                                                     fields=[])
         set_count_down_schema = BooleanSchema(label="Set Count Down", name="setCountDown",
                                               definition="http://bottsinc.com/def/SetCountDown")
         set_step_schema = CountSchema(label="Set Step", name="setStep", definition="http://bottsinc.com/def/SetStep")
@@ -69,8 +68,14 @@ class ControllableCounterSim(Sim):
         set_upper_bound_schema = CountSchema(label="Set Upper Bound", name="setUpperBound",
                                              definition="http://bottsinc.com/def/SetUpperBound")
 
-        self.controlstream_schema.fields.extend(
-            [set_count_down_schema, set_step_schema, set_lower_bound_schema, set_upper_bound_schema])
+        self.controlstream_schema = DataRecordSchema(
+            name="controllable_counter_control",
+            label="Controllable Counter Control",
+            description="Control stream for the controllable counter simulation",
+            definition="http://bottsinc.com/def/ControllableCounterControl",
+            fields=[set_count_down_schema, set_step_schema,
+                    set_lower_bound_schema, set_upper_bound_schema],
+        )
 
     def insert(self, system: System = None, datastream_schema: DataRecordSchema = None,
                controlstream: DataRecordSchema = None):

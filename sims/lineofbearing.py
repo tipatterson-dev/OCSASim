@@ -32,9 +32,6 @@ class LoBSim(Sim):
 
         super().__init__(name, app, node)
 
-        self.ds_schema = DataRecordSchema(label="LoB Sim",
-                                          description="A sim line of bearing simulation",
-                                          definition="http://bottsinc.com/def/LineOfBearingSim", fields=[])
         timestamp = TimeSchema(label="Timestamp", name="timestamp", description="Timestamp of the GPS data",
                                definition="http://www.opengis.net/def/property/OGC/0/SamplingTime",
                                uom=URI(href="http://www.opengis.net/def/uom/ISO-8601/0/Gregorian"))
@@ -55,8 +52,13 @@ class LoBSim(Sim):
                                  definition="http://sensorml.com/ont/swe/property/Bearing",
                                  uom=UCUMCode(code='deg', label='degrees'))
 
-        self.ds_schema.fields.extend(
-            [timestamp, location, raw_lob])
+        self.ds_schema = DataRecordSchema(
+            name="lob",
+            label="LoB Sim",
+            description="A sim line of bearing simulation",
+            definition="http://bottsinc.com/def/LineOfBearingSim",
+            fields=[timestamp, location, raw_lob],
+        )
 
     def insert(self, system: System = None, datastream_schema: DataRecordSchema = None,
                controlstream: DataRecordSchema = None):
