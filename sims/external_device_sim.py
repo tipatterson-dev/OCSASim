@@ -9,10 +9,11 @@ Unlike the Sim subclasses, this class does NOT create any resources in
 OSH — the device registers itself via setup_osh.py (or equivalent).
 """
 
+import contextlib
 import json
 import logging
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from oshconnect.streamableresource import Node
 
@@ -37,7 +38,7 @@ class ExternalDeviceSim:
     last_count   : int | None
     """
 
-    ONLINE_TIMEOUT_S = 60   # seconds without a message → considered offline
+    ONLINE_TIMEOUT_S = 60  # seconds without a message → considered offline
 
     def __init__(
         self,
@@ -49,17 +50,17 @@ class ExternalDeviceSim:
         command_topic: str,
         status_topic: str,
     ):
-        self.name          = name
-        self.node          = node
-        self.system_id     = system_id
-        self.system_label  = system_label
-        self.obs_topics    = obs_topics      # one per datastream
+        self.name = name
+        self.node = node
+        self.system_id = system_id
+        self.system_label = system_label
+        self.obs_topics = obs_topics  # one per datastream
         self.command_topic = command_topic
-        self.status_topic  = status_topic
+        self.status_topic = status_topic
 
-        self.last_seen:  float       = 0.0
-        self.last_temp:  float | None = None
-        self.last_count: int   | None = None
+        self.last_seen: float = 0.0
+        self.last_temp: float | None = None
+        self.last_count: int | None = None
 
     # ── Incoming data ─────────────────────────────────────────────────────────
 
@@ -67,22 +68,18 @@ class ExternalDeviceSim:
         """Called by node_manager when an MQTT message arrives for this device."""
         self.last_seen = time.time()
         try:
-            data   = json.loads(payload_str)
+            data = json.loads(payload_str)
             result = data.get("result", {})
         except (json.JSONDecodeError, AttributeError):
             return
 
         # Identify stream by field presence
         if "temperature" in result:
-            try:
+            with contextlib.suppress(TypeError, ValueError):
                 self.last_temp = float(result["temperature"])
-            except (TypeError, ValueError):
-                pass
         if "count" in result:
-            try:
+            with contextlib.suppress(TypeError, ValueError):
                 self.last_count = int(result["count"])
-            except (TypeError, ValueError):
-                pass
 
     # ── Outgoing command ──────────────────────────────────────────────────────
 
@@ -94,23 +91,27 @@ class ExternalDeviceSim:
             {"id": "web-api", "parameters": {"direction_up": bool, "step": int}}
         """
         try:
-            cmd    = json.loads(cmd_json)
+            cmd = json.loads(cmd_json)
             params = cmd.get("parameters", {})
         except (json.JSONDecodeError, AttributeError):
             logger.warning("[ExternalDeviceSim:%s] Bad command JSON: %s", self.name, cmd_json)
             return
 
-        payload = json.dumps({
-            "issueTime": datetime.now(timezone.utc).isoformat(),
-            "params": {
-                "direction_up": bool(params.get("direction_up", True)),
-                "step": int(params.get("step", 1)),
-            },
-        })
+        payload = json.dumps(
+            {
+                "issueTime": datetime.now(UTC).isoformat(),
+                "params": {
+                    "direction_up": bool(params.get("direction_up", True)),
+                    "step": int(params.get("step", 1)),
+                },
+            }
+        )
 
         try:
             self.node.get_mqtt_client().publish(self.command_topic, payload)
-            logger.debug("[ExternalDeviceSim:%s] Command published to %s", self.name, self.command_topic)
+            logger.debug(
+                "[ExternalDeviceSim:%s] Command published to %s", self.name, self.command_topic
+            )
         except Exception as exc:
             logger.error("[ExternalDeviceSim:%s] Publish failed: %s", self.name, exc)
 
@@ -125,15 +126,15 @@ class ExternalDeviceSim:
 
     def to_dict(self) -> dict:
         return {
-            "name":         self.name,
-            "system_id":    self.system_id,
+            "name": self.name,
+            "system_id": self.system_id,
             "system_label": self.system_label,
-            "online":       self.is_online(),
-            "last_temp":    self.last_temp,
-            "last_count":   self.last_count,
+            "online": self.is_online(),
+            "last_temp": self.last_temp,
+            "last_count": self.last_count,
             "topics": {
                 "observations": self.obs_topics,
-                "commands":     self.command_topic,
-                "status":       self.status_topic,
+                "commands": self.command_topic,
+                "status": self.status_topic,
             },
         }

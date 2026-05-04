@@ -1,8 +1,10 @@
+import contextlib
 import logging
 import re
 import uuid
 
-from oshconnect import OSHConnect, Node, SQLiteDataStore, System as OSHSystem
+from oshconnect import Node, OSHConnect, SQLiteDataStore
+from oshconnect import System as OSHSystem
 from oshconnect.csapi4py.constants import APIResourceTypes
 from oshconnect.streamableresource import StreamableModes
 
@@ -52,7 +54,7 @@ def _ensure_controlstream(sim) -> None:
     Old datastore rows may predate controlstream persistence, and the server may not have
     a controlstream for a system that was inserted before this sim's schema required one.
     """
-    schema = getattr(sim, 'controlstream_schema', None)
+    schema = getattr(sim, "controlstream_schema", None)
     if schema is None or sim.controlstream is not None or sim.system is None:
         return
     try:
@@ -86,12 +88,20 @@ def _restore_sim_from_store(osh, node, sim, target_urn: str) -> bool:
                         try:
                             new_sys.discover_controlstreams()
                         except Exception as e:
-                            logger.warning("discover_controlstreams for '%s' failed: %s", sim.name, e)
-                    sim.controlstream = new_sys.control_channels[0] if new_sys.control_channels else None
+                            logger.warning(
+                                "discover_controlstreams for '%s' failed: %s", sim.name, e
+                            )
+                    sim.controlstream = (
+                        new_sys.control_channels[0] if new_sys.control_channels else None
+                    )
                     node._systems.append(new_sys)
                     _ensure_controlstream(sim)
                     _apply_connection_modes(sim)
-                    logger.info("Restored '%s' from datastore (system_id=%s)", sim.name, new_sys._resource_id)
+                    logger.info(
+                        "Restored '%s' from datastore (system_id=%s)",
+                        sim.name,
+                        new_sys._resource_id,
+                    )
                     return True
     except Exception as e:
         logger.warning("Could not restore '%s' from datastore: %s", sim.name, e)
@@ -111,7 +121,7 @@ def _restore_sim_from_node(node, sim, target_urn: str) -> bool:
     Returns True on success, False if no matching system is found.
     """
     for sys in node._systems:
-        if getattr(sys, 'urn', None) != target_urn:
+        if getattr(sys, "urn", None) != target_urn:
             continue
         if sys._resource_id is None:
             # Discovered placeholder without a server ID — not usable
@@ -127,7 +137,9 @@ def _restore_sim_from_node(node, sim, target_urn: str) -> bool:
         sim.controlstream = sys.control_channels[0] if sys.control_channels else None
         _ensure_controlstream(sim)
         _apply_connection_modes(sim)
-        logger.info("Restored '%s' from discovered node systems (system_id=%s)", sim.name, sys._resource_id)
+        logger.info(
+            "Restored '%s' from discovered node systems (system_id=%s)", sim.name, sys._resource_id
+        )
         return True
     return False
 
@@ -138,9 +150,16 @@ def clear_store() -> None:
     logger.info("Datastore cleared")
 
 
-def connect(protocol: str, host: str, port: int, username: str, password: str,
-            api_root: str = "api", mqtt_topic_root: str = "oshex",
-            use_datastore: bool = False) -> tuple[str | None, str | None]:
+def connect(
+    protocol: str,
+    host: str,
+    port: int,
+    username: str,
+    password: str,
+    api_root: str = "api",
+    mqtt_topic_root: str = "oshex",
+    use_datastore: bool = False,
+) -> tuple[str | None, str | None]:
     """
     Connect to an OSH node, optionally restoring sims from the local datastore.
     Returns (node_id, None) on success or (None, error_message) on failure.
@@ -148,9 +167,16 @@ def connect(protocol: str, host: str, port: int, username: str, password: str,
     try:
         node_id = uuid.uuid4().hex[:8]
         osh = OSHConnect("OCSASim", datastore=_store if use_datastore else None)
-        node = Node(protocol, host, port, username, password,
-                    api_root=api_root, mqtt_topic_root=mqtt_topic_root,
-                    enable_mqtt=True)
+        node = Node(
+            protocol,
+            host,
+            port,
+            username,
+            password,
+            api_root=api_root,
+            mqtt_topic_root=mqtt_topic_root,
+            enable_mqtt=True,
+        )
         osh.add_node(node)
         osh.discover_systems()
         osh.discover_datastreams()
@@ -169,18 +195,22 @@ def connect(protocol: str, host: str, port: int, username: str, password: str,
         lob = LoBSim("LoBSim", osh, node)
 
         counter_urn = f"urn:OCSASim:ControllableCounter:{counter.name}"
-        lob_urn     = f"urn:OCSASim:SimLoB:{lob.name}"
+        lob_urn = f"urn:OCSASim:SimLoB:{lob.name}"
 
         if use_datastore:
-            if not _restore_sim_from_store(osh, node, counter, counter_urn):
-                if not _restore_sim_from_node(node, counter, counter_urn):
-                    logger.info("[%s] Inserting ControllableCounter (not in datastore or node)", node_id)
-                    counter.insert()
+            if not _restore_sim_from_store(
+                osh, node, counter, counter_urn
+            ) and not _restore_sim_from_node(node, counter, counter_urn):
+                logger.info(
+                    "[%s] Inserting ControllableCounter (not in datastore or node)", node_id
+                )
+                counter.insert()
 
-            if not _restore_sim_from_store(osh, node, lob, lob_urn):
-                if not _restore_sim_from_node(node, lob, lob_urn):
-                    logger.info("[%s] Inserting LoBSim (not in datastore or node)", node_id)
-                    lob.insert()
+            if not _restore_sim_from_store(osh, node, lob, lob_urn) and not _restore_sim_from_node(
+                node, lob, lob_urn
+            ):
+                logger.info("[%s] Inserting LoBSim (not in datastore or node)", node_id)
+                lob.insert()
 
             # Persist the full resource graph (upsert — safe to call on every connect)
             osh.save_to_store()
@@ -217,8 +247,8 @@ def connect(protocol: str, host: str, port: int, username: str, password: str,
 def _spec_to_sim_name(spec: dict, node_id: str) -> str:
     """Derive a unique, URL-safe sim name from the spec label."""
     label = spec.get("label", "custom")
-    base  = re.sub(r'[^a-z0-9_]', '', label.lower().replace(' ', '_').replace('-', '_'))
-    base  = base.strip('_') or "custom"
+    base = re.sub(r"[^a-z0-9_]", "", label.lower().replace(" ", "_").replace("-", "_"))
+    base = base.strip("_") or "custom"
     name, n = base, 1
     while sim_registry.get(node_id, name) is not None:
         name, n = f"{base}_{n}", n + 1
@@ -232,6 +262,7 @@ def create_custom_sim(node_id: str, spec: dict) -> tuple[str | None, str | None]
         return None, "Node not found"
     try:
         from sims.custom_sim import CustomSim
+
         sim_name = _spec_to_sim_name(spec, node_id)
         sim = CustomSim(sim_name, entry["osh"], entry["node"], spec)
         sim.insert()
@@ -247,10 +278,10 @@ def create_custom_sim(node_id: str, spec: dict) -> tuple[str | None, str | None]
 # Regex to extract the datastream ID from an observation MQTT topic.
 # Matches both "/api/datastreams/{id}/observations" and
 # "oshex/api/datastreams/{id}/observations" (with optional prefix).
-_DS_OBS_RE = re.compile(r'(?:^|/)datastreams/([^/]+)/observations$')
+_DS_OBS_RE = re.compile(r"(?:^|/)datastreams/([^/]+)/observations$")
 
 # Regex to detect a command data topic for any control stream.
-_CS_CMD_RE = re.compile(r'(?:^|/)controlstreams/([^/]+)/commands')
+_CS_CMD_RE = re.compile(r"(?:^|/)controlstreams/([^/]+)/commands")
 
 
 def _on_mqtt_message(node_id: str, topic: str, payload: str) -> None:
@@ -268,8 +299,7 @@ def _on_mqtt_message(node_id: str, topic: str, payload: str) -> None:
             if cs is None:
                 continue
             try:
-                cmd_topic = cs.get_mqtt_topic(
-                    subresource=APIResourceTypes.COMMAND, data_topic=True)
+                cmd_topic = cs.get_mqtt_topic(subresource=APIResourceTypes.COMMAND, data_topic=True)
             except Exception:
                 continue
             if cmd_topic and topic == cmd_topic:
@@ -311,7 +341,9 @@ def _on_mqtt_message(node_id: str, topic: str, payload: str) -> None:
         return
 
     # Unknown observation topic — try to discover the external device
-    logger.info("[%s] Unknown observation topic detected: %s — attempting discovery", node_id, topic)
+    logger.info(
+        "[%s] Unknown observation topic detected: %s — attempting discovery", node_id, topic
+    )
     _try_discover_external_device(node_id, ds_id, topic)
 
 
@@ -324,14 +356,16 @@ def _try_discover_external_device(node_id: str, ds_id: str, trigger_topic: str) 
     if not entry:
         return
 
-    api  = entry["node"].get_api_helper()
+    api = entry["node"].get_api_helper()
     node = entry["node"]
 
     try:
         # 1. Fetch the triggering datastream to find its parent system
         resp = api.get_resource(APIResourceTypes.DATASTREAM, resource_id=ds_id)
         if not resp.ok:
-            logger.warning("[%s] Could not fetch datastream %s: %d", node_id, ds_id, resp.status_code)
+            logger.warning(
+                "[%s] Could not fetch datastream %s: %d", node_id, ds_id, resp.status_code
+            )
             return
         ds_data = resp.json()
         system_id = ds_data.get("systemId") or ds_data.get("system@id")
@@ -348,14 +382,16 @@ def _try_discover_external_device(node_id: str, ds_id: str, trigger_topic: str) 
         system_label = system_id
         if sys_resp.ok:
             sys_data = sys_resp.json()
-            system_label = (sys_data.get("properties", {}).get("name")
-                            or sys_data.get("label")
-                            or system_id)
+            system_label = (
+                sys_data.get("properties", {}).get("name") or sys_data.get("label") or system_id
+            )
 
         # 3. Fetch all datastreams for this system
         all_ds_resp = api.get_resource(
-            APIResourceTypes.SYSTEM, resource_id=system_id,
-            subresource_type=APIResourceTypes.DATASTREAM)
+            APIResourceTypes.SYSTEM,
+            resource_id=system_id,
+            subresource_type=APIResourceTypes.DATASTREAM,
+        )
         obs_topics: list[str] = [trigger_topic]
         if all_ds_resp.ok:
             items = all_ds_resp.json()
@@ -367,16 +403,19 @@ def _try_discover_external_device(node_id: str, ds_id: str, trigger_topic: str) 
                     t = api.get_mqtt_topic(
                         resource_type=APIResourceTypes.DATASTREAM,
                         subresource_type=APIResourceTypes.OBSERVATION,
-                        resource_id=item_id)
+                        resource_id=item_id,
+                    )
                     if t and t not in obs_topics:
                         obs_topics.append(t)
 
         # 4. Fetch control streams for this system
         cs_resp = api.get_resource(
-            APIResourceTypes.SYSTEM, resource_id=system_id,
-            subresource_type=APIResourceTypes.CONTROL_CHANNEL)
+            APIResourceTypes.SYSTEM,
+            resource_id=system_id,
+            subresource_type=APIResourceTypes.CONTROL_CHANNEL,
+        )
         command_topic = ""
-        status_topic  = ""
+        status_topic = ""
         if cs_resp.ok:
             items = cs_resp.json()
             if isinstance(items, dict):
@@ -387,14 +426,18 @@ def _try_discover_external_device(node_id: str, ds_id: str, trigger_topic: str) 
                     command_topic = api.get_mqtt_topic(
                         resource_type=APIResourceTypes.CONTROL_CHANNEL,
                         subresource_type=APIResourceTypes.COMMAND,
-                        resource_id=cs_id)
+                        resource_id=cs_id,
+                    )
                     status_topic = api.get_mqtt_topic(
                         resource_type=APIResourceTypes.CONTROL_CHANNEL,
                         subresource_type=APIResourceTypes.STATUS,
-                        resource_id=cs_id)
+                        resource_id=cs_id,
+                    )
 
         # 5. Build and register the ExternalDeviceSim
-        device_name = re.sub(r'[^a-z0-9_]', '', system_label.lower().replace(' ', '_')) or system_id[:8]
+        device_name = (
+            re.sub(r"[^a-z0-9_]", "", system_label.lower().replace(" ", "_")) or system_id[:8]
+        )
         device = ExternalDeviceSim(
             name=device_name,
             node=node,
@@ -412,14 +455,18 @@ def _try_discover_external_device(node_id: str, ds_id: str, trigger_topic: str) 
         if status_topic:
             bridge.subscribe_topic(node_id, status_topic)
 
-        logger.info("[%s] External device discovered: %s (system=%s)", node_id, device_name, system_id)
+        logger.info(
+            "[%s] External device discovered: %s (system=%s)", node_id, device_name, system_id
+        )
 
         # Broadcast discovery event to WebSocket clients
-        bridge.broadcast_event({
-            "type":    "device_discovered",
-            "node_id": node_id,
-            "device":  device.to_dict(),
-        })
+        bridge.broadcast_event(
+            {
+                "type": "device_discovered",
+                "node_id": node_id,
+                "device": device.to_dict(),
+            }
+        )
 
     except Exception as exc:
         logger.exception("[%s] Error during external device discovery: %s", node_id, exc)
@@ -436,7 +483,7 @@ def send_device_command(node_id: str, name: str, cmd_json: str) -> str | None:
     Returns an error string on failure, None on success.
     """
     devices = _external_devices.get(node_id, {})
-    device  = next((d for d in devices.values() if d.name == name), None)
+    device = next((d for d in devices.values() if d.name == name), None)
     if device is None:
         return f"External device '{name}' not found for node '{node_id}'"
     try:
@@ -454,12 +501,10 @@ def disconnect(node_id: str) -> tuple[bool, str | None]:
     try:
         for sim in sim_registry.get_all_for_node(node_id):
             if getattr(sim, "should_simulate", False):
-                try:
+                with contextlib.suppress(Exception):
                     sim.stop()
-                except Exception:
-                    pass
         sim_registry.remove_for_node(node_id)
-        bridge.detach_node(node_id)   # also clears the message hook
+        bridge.detach_node(node_id)  # also clears the message hook
         _external_devices.pop(node_id, None)
         _known_obs_topics.pop(node_id, None)
     except Exception as e:

@@ -1,11 +1,11 @@
-import asyncio
 import uuid
 from abc import ABC, abstractmethod
+
 # from multiprocessing import Process
 from threading import Thread
 
-from oshconnect import OSHConnect, Node, System, Datastream
-from oshconnect.streamableresource import StreamableModes, ControlStream
+from oshconnect import Datastream, Node, OSHConnect, System
+from oshconnect.streamableresource import ControlStream, StreamableModes
 from oshconnect.swe_components import DataRecordSchema
 
 
@@ -13,6 +13,7 @@ class Sim(ABC):
     """
     A base class for a simulation.
     """
+
     name: str
     app: OSHConnect
     node: Node
@@ -32,7 +33,12 @@ class Sim(ABC):
         self.controlstream = None
         self.thread = None
 
-    def insert(self, system: System, datastream_schema: DataRecordSchema, ControlStream: DataRecordSchema = None):
+    def insert(
+        self,
+        system: System,
+        datastream_schema: DataRecordSchema,
+        ControlStream: DataRecordSchema = None,
+    ):
         """
         Inserts the included system and datastream into the node.
         :return:
@@ -55,7 +61,6 @@ class Sim(ABC):
             self.controlstream.initialize()
             self.controlstream.start()
 
-        # self.process = Process(target=self.run_sim)
         self.thread = Thread(target=self.simulation)
         self.thread.start()
 
@@ -69,10 +74,4 @@ class Sim(ABC):
         The main simulation loop. This method should be implemented by subclasses.
         :return:
         """
-        pass
-
-    def run_sim(self):
-        # loop = asyncio.new_event_loop()
-        # asyncio.set_event_loop(loop)
-        # loop.run_until_complete(self.simulation())
         pass

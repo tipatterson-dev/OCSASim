@@ -2,12 +2,12 @@ import asyncio
 import json
 
 from fastapi import APIRouter, Body, HTTPException, WebSocket, WebSocketDisconnect
+from oshconnect.csapi4py.constants import APIResourceTypes
 from pydantic import BaseModel
 
-from oshconnect.csapi4py.constants import APIResourceTypes
-from web.mqtt_bridge import bridge
-from web.sim_registry import get, list_for_node, get_topics
 import web.node_manager as node_manager
+from web.mqtt_bridge import bridge
+from web.sim_registry import get, get_topics, list_for_node
 
 router = APIRouter()
 
@@ -24,6 +24,7 @@ class NodeConfig(BaseModel):
 
 
 # ── Node Management ────────────────────────────────────────────────────────
+
 
 @router.get("/api/nodes")
 def get_nodes():
@@ -44,8 +45,14 @@ async def connect_node(cfg: NodeConfig):
     node_id, err = await loop.run_in_executor(
         None,
         lambda: node_manager.connect(
-            cfg.protocol, cfg.host, cfg.port, cfg.username, cfg.password,
-            cfg.api_root, cfg.mqtt_topic_root, cfg.use_datastore,
+            cfg.protocol,
+            cfg.host,
+            cfg.port,
+            cfg.username,
+            cfg.password,
+            cfg.api_root,
+            cfg.mqtt_topic_root,
+            cfg.use_datastore,
         ),
     )
     if err:
@@ -64,6 +71,7 @@ async def disconnect_node(node_id: str):
 
 # ── Datastore ──────────────────────────────────────────────────────────────
 
+
 @router.delete("/api/datastore")
 def clear_datastore():
     node_manager.clear_store()
@@ -71,6 +79,7 @@ def clear_datastore():
 
 
 # ── Sims (node-scoped) ─────────────────────────────────────────────────────
+
 
 @router.get("/api/nodes/{node_id}/sims")
 def get_sims_for_node(node_id: str):
@@ -124,18 +133,19 @@ async def send_command(node_id: str, name: str, body: dict):
     if cs is None:
         raise HTTPException(status_code=400, detail=f"Sim '{name}' does not support commands")
     if not sim.should_simulate:
-        raise HTTPException(status_code=400, detail=f"Sim '{name}' must be running to send commands")
+        raise HTTPException(
+            status_code=400, detail=f"Sim '{name}' must be running to send commands"
+        )
 
     # Only send parameters that differ from the sim's current state
     state_map = {
         "setCountDown": "count_down",
-        "setStep":      "step",
+        "setStep": "step",
         "setLowerBound": "lower_bound",
         "setUpperBound": "upper_bound",
     }
     changed = {
-        k: v for k, v in body.items()
-        if k in state_map and getattr(sim, state_map[k], None) != v
+        k: v for k, v in body.items() if k in state_map and getattr(sim, state_map[k], None) != v
     }
     if not changed:
         return {"status": "ok", "note": "no changes"}
@@ -161,6 +171,7 @@ async def send_command(node_id: str, name: str, body: dict):
 
 
 # ── MQTT Subscriptions (node-scoped) ───────────────────────────────────────
+
 
 @router.get("/api/mqtt/subscriptions")
 def get_all_mqtt_subscriptions():
@@ -193,6 +204,7 @@ def mqtt_unsubscribe(node_id: str, body: dict):
 
 # ── External devices (node-scoped) ────────────────────────────────────────────
 
+
 @router.get("/api/nodes/{node_id}/devices")
 def get_external_devices(node_id: str):
     """Return all auto-discovered external devices (e.g. Arduino) for a node."""
@@ -203,8 +215,7 @@ def get_external_devices(node_id: str):
 async def send_device_command(node_id: str, name: str, body: dict):
     """Forward a direction/step command to an external device's control stream."""
     err = node_manager.send_device_command(
-        node_id, name,
-        json.dumps({"id": "web-api", "parameters": body})
+        node_id, name, json.dumps({"id": "web-api", "parameters": body})
     )
     if err:
         raise HTTPException(status_code=404, detail=err)
@@ -212,6 +223,7 @@ async def send_device_command(node_id: str, name: str, body: dict):
 
 
 # ── WebSocket feed ─────────────────────────────────────────────────────────
+
 
 @router.websocket("/ws/mqtt")
 async def mqtt_ws(ws: WebSocket):

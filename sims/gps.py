@@ -1,17 +1,18 @@
 import asyncio
 import math
-import multiprocessing
 import time
 import uuid
 
-from oshconnect import OSHConnect, Node, System, Datastream
+from oshconnect import Datastream, Node, OSHConnect, System
 from oshconnect.api_utils import URI, UCUMCode
 from oshconnect.streamableresource import StreamableModes
-from oshconnect.swe_components import TimeSchema, VectorSchema, QuantitySchema, DataRecordSchema
+from oshconnect.swe_components import DataRecordSchema, QuantitySchema, TimeSchema, VectorSchema
 from oshconnect.timemanagement import TimeInstant
+
+
 def to_lower_camel(s: str) -> str:
-    parts = s.split('_')
-    return parts[0] + ''.join(p.title() for p in parts[1:])
+    parts = s.split("_")
+    return parts[0] + "".join(p.title() for p in parts[1:])
 
 
 class GPSSim:
@@ -37,36 +38,68 @@ class GPSSim:
         self._uuid = uuid.uuid1()
         self.system = None
         self.datastream = None
+        self._task: asyncio.Task | None = None
 
     def insert(self):
         if self.system is None:
-            self.system = System(name=to_lower_camel(self.name), label=self.name, urn=f"urn:OCSASim:GPS:111", parent_node=self.node)
+            self.system = System(
+                name=to_lower_camel(self.name),
+                label=self.name,
+                urn="urn:OCSASim:GPS:111",
+                parent_node=self.node,
+            )
             # self.system = System(name=to_lower_camel(self.name), label=self.name, urn=f"urn:OCSASim:GPS:{self._uuid}")
 
         self.node.add_system(self.system, True)
-        datastream_schema = DataRecordSchema(label="GPS Simulated Location",
-                                             description="GPS Simulated Location",
-                                             definition="http://sensorml.com/ont/swe/property/Position", fields=[])
-        timestamp = TimeSchema(label="Timestamp", name="timestamp", description="Timestamp of the GPS data",
-                               definition="http://www.opengis.net/def/property/OGC/0/SamplingTime",
-                               uom=URI(href="http://www.opengis.net/def/uom/ISO-8601/0/Gregorian"))
+        datastream_schema = DataRecordSchema(
+            label="GPS Simulated Location",
+            description="GPS Simulated Location",
+            definition="http://sensorml.com/ont/swe/property/Position",
+            fields=[],
+        )
+        timestamp = TimeSchema(
+            label="Timestamp",
+            name="timestamp",
+            description="Timestamp of the GPS data",
+            definition="http://www.opengis.net/def/property/OGC/0/SamplingTime",
+            uom=URI(href="http://www.opengis.net/def/uom/ISO-8601/0/Gregorian"),
+        )
 
-        location = VectorSchema(label="Location", name="location", description="GPS Location",
-                                definition="http://www.opengis.net/def/property/OGC/0/SensorLocation",
-                                reference_frame="http://www.opengis.net/def/crs/EPSG/0/4979",
-                                coordinates=[QuantitySchema(label="Latitude", name="lat",
-                                                            definition="http://sensorml.com/ont/swe/property/Latitude",
-                                                            uom=UCUMCode(code='deg', label='degrees')),
-                                             QuantitySchema(label="Longitude", name="lon",
-                                                            definition="http://sensorml.com/ont/swe/property/Longitude",
-                                                            uom=UCUMCode(code='deg', label='degrees')),
-                                             QuantitySchema(label="Altitude", name="alt",
-                                                            definition="http://sensorml.com/ont/swe/property/Altitude",
-                                                            uom=UCUMCode(code='m', label='meters'))])
+        location = VectorSchema(
+            label="Location",
+            name="location",
+            description="GPS Location",
+            definition="http://www.opengis.net/def/property/OGC/0/SensorLocation",
+            reference_frame="http://www.opengis.net/def/crs/EPSG/0/4979",
+            coordinates=[
+                QuantitySchema(
+                    label="Latitude",
+                    name="lat",
+                    definition="http://sensorml.com/ont/swe/property/Latitude",
+                    uom=UCUMCode(code="deg", label="degrees"),
+                ),
+                QuantitySchema(
+                    label="Longitude",
+                    name="lon",
+                    definition="http://sensorml.com/ont/swe/property/Longitude",
+                    uom=UCUMCode(code="deg", label="degrees"),
+                ),
+                QuantitySchema(
+                    label="Altitude",
+                    name="alt",
+                    definition="http://sensorml.com/ont/swe/property/Altitude",
+                    uom=UCUMCode(code="m", label="meters"),
+                ),
+            ],
+        )
 
-        orientation = QuantitySchema(label="Orientation", name="orientation", description="GPS Orientation - Heading",
-                                     definition="http://sensorml.com/ont/swe/property/Orientation",
-                                     uom=UCUMCode(code='deg', label='degrees'))
+        orientation = QuantitySchema(
+            label="Orientation",
+            name="orientation",
+            description="GPS Orientation - Heading",
+            definition="http://sensorml.com/ont/swe/property/Orientation",
+            uom=UCUMCode(code="deg", label="degrees"),
+        )
         datastream_schema.fields.append(timestamp)
         datastream_schema.fields.append(location)
         datastream_schema.fields.append(orientation)
@@ -74,10 +107,7 @@ class GPSSim:
         self.datastream = self.system.add_insert_datastream(datastream_schema)
         self.datastream.set_connection_mode(StreamableModes.PUSH)
 
-        if self.datastream is None:
-            return False
-        else:
-            return True
+        return self.datastream is not None
 
     def start(self):
         """
@@ -88,7 +118,7 @@ class GPSSim:
         # self.datastream.initialize()
         self.datastream.initialize()
         self.datastream.start()
-        task2 = asyncio.create_task(self.simulation())
+        self._task = asyncio.create_task(self.simulation())
 
         # return multiprocessing.Process(target=self.simulation(), args=(self,))
 
@@ -113,13 +143,9 @@ class GPSSim:
                 "phenomenonTime": timedata,
                 "result": {
                     # "timestamp": timeinstant.epoch_time,
-                    "location": {
-                        "lat": lat,
-                        "lon": lon,
-                        "alt": alt
-                    },
-                    "orientation": 180.0
-                }
+                    "location": {"lat": lat, "lon": lon, "alt": alt},
+                    "orientation": 180.0,
+                },
             }
 
             # self.datastream.insert_observation_dict(gps_sim_data)

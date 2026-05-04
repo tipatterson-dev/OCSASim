@@ -1,28 +1,29 @@
 import copy
 import json
-import pickle
 import time
-from multiprocessing import Process, Queue
 from threading import Thread
 from typing import Literal
 
-from oshconnect import OSHConnect, Node, System
+from oshconnect import Node, OSHConnect, System
 from oshconnect.api_utils import URI
 from oshconnect.csapi4py.constants import APIResourceTypes
 from oshconnect.streamableresource import StreamableModes
-from oshconnect.swe_components import DataRecordSchema, TimeSchema, CountSchema, BooleanSchema
+from oshconnect.swe_components import BooleanSchema, CountSchema, DataRecordSchema, TimeSchema
 from oshconnect.timemanagement import TimeInstant
-def to_lower_camel(s: str) -> str:
-    parts = s.split('_')
-    return parts[0] + ''.join(p.title() for p in parts[1:])
 
 from sims.sim import Sim
+
+
+def to_lower_camel(s: str) -> str:
+    parts = s.split("_")
+    return parts[0] + "".join(p.title() for p in parts[1:])
 
 
 class ControllableCounterSim(Sim):
     """
     A simple controllable counter simulation.
     """
+
     count_down: bool = False
     count: int = 0
     lower_bound: int = 0
@@ -39,46 +40,84 @@ class ControllableCounterSim(Sim):
         # lower_bound between construction and start() (e.g. via main.py's
         # config loader) is honored on the first tick.
 
-        timestamp = TimeSchema(label="Timestamp", name="timestamp", description="Timestamp of the GPS data",
-                               definition="http://www.opengis.net/def/property/OGC/0/SamplingTime",
-                               uom=URI(href="http://www.opengis.net/def/uom/ISO-8601/0/Gregorian"))
-        counter_schema = CountSchema(label="Count", name="count", definition="http://bottsinc.com/def/CounterSim", )
-        count_down_schema = BooleanSchema(label="Count Down", name="countDown",
-                                          definition="http://bottsinc.com/def/CountDown")
-        step_schema = CountSchema(label="Step", name="step", definition="http://bottsinc.com/def/Step")
-        lower_bound_schema = CountSchema(label="Lower Bound", name="lowerBound",
-                                         definition="http://bottsinc.com/def/LowerBound")
-        upper_bound_schema = CountSchema(label="Upper Bound", name="upperBound",
-                                         definition="http://bottsinc.com/def/UpperBound")
+        timestamp = TimeSchema(
+            label="Timestamp",
+            name="timestamp",
+            description="Timestamp of the GPS data",
+            definition="http://www.opengis.net/def/property/OGC/0/SamplingTime",
+            uom=URI(href="http://www.opengis.net/def/uom/ISO-8601/0/Gregorian"),
+        )
+        counter_schema = CountSchema(
+            label="Count",
+            name="count",
+            definition="http://bottsinc.com/def/CounterSim",
+        )
+        count_down_schema = BooleanSchema(
+            label="Count Down", name="countDown", definition="http://bottsinc.com/def/CountDown"
+        )
+        step_schema = CountSchema(
+            label="Step", name="step", definition="http://bottsinc.com/def/Step"
+        )
+        lower_bound_schema = CountSchema(
+            label="Lower Bound", name="lowerBound", definition="http://bottsinc.com/def/LowerBound"
+        )
+        upper_bound_schema = CountSchema(
+            label="Upper Bound", name="upperBound", definition="http://bottsinc.com/def/UpperBound"
+        )
 
         self.ds_schema = DataRecordSchema(
             name="controllable_counter",
             label="Controllable Counter",
             description="A simple controllable counter simulation",
             definition="http://bottsinc.com/def/ControllableCounter",
-            fields=[timestamp, counter_schema, count_down_schema, step_schema,
-                    lower_bound_schema, upper_bound_schema],
+            fields=[
+                timestamp,
+                counter_schema,
+                count_down_schema,
+                step_schema,
+                lower_bound_schema,
+                upper_bound_schema,
+            ],
         )
 
-        set_count_down_schema = BooleanSchema(label="Set Count Down", name="setCountDown",
-                                              definition="http://bottsinc.com/def/SetCountDown")
-        set_step_schema = CountSchema(label="Set Step", name="setStep", definition="http://bottsinc.com/def/SetStep")
-        set_lower_bound_schema = CountSchema(label="Set Lower Bound", name="setLowerBound",
-                                             definition="http://bottsinc.com/def/SetLowerBound")
-        set_upper_bound_schema = CountSchema(label="Set Upper Bound", name="setUpperBound",
-                                             definition="http://bottsinc.com/def/SetUpperBound")
+        set_count_down_schema = BooleanSchema(
+            label="Set Count Down",
+            name="setCountDown",
+            definition="http://bottsinc.com/def/SetCountDown",
+        )
+        set_step_schema = CountSchema(
+            label="Set Step", name="setStep", definition="http://bottsinc.com/def/SetStep"
+        )
+        set_lower_bound_schema = CountSchema(
+            label="Set Lower Bound",
+            name="setLowerBound",
+            definition="http://bottsinc.com/def/SetLowerBound",
+        )
+        set_upper_bound_schema = CountSchema(
+            label="Set Upper Bound",
+            name="setUpperBound",
+            definition="http://bottsinc.com/def/SetUpperBound",
+        )
 
         self.controlstream_schema = DataRecordSchema(
             name="controllable_counter_control",
             label="Controllable Counter Control",
             description="Control stream for the controllable counter simulation",
             definition="http://bottsinc.com/def/ControllableCounterControl",
-            fields=[set_count_down_schema, set_step_schema,
-                    set_lower_bound_schema, set_upper_bound_schema],
+            fields=[
+                set_count_down_schema,
+                set_step_schema,
+                set_lower_bound_schema,
+                set_upper_bound_schema,
+            ],
         )
 
-    def insert(self, system: System = None, datastream_schema: DataRecordSchema = None,
-               controlstream: DataRecordSchema = None):
+    def insert(
+        self,
+        system: System = None,
+        datastream_schema: DataRecordSchema = None,
+        controlstream: DataRecordSchema = None,
+    ):
         """
         Inserts the default system and datastream into the node. Ignores the params from the super class for this sim.
         :param system:
@@ -86,8 +125,12 @@ class ControllableCounterSim(Sim):
         :param ControlStream:
         :return:
         """
-        self.system = System(name=to_lower_camel(self.name), label=self.name,
-                             urn=f"urn:OCSASim:ControllableCounter:{self.name}", parent_node=self.node)
+        self.system = System(
+            name=to_lower_camel(self.name),
+            label=self.name,
+            urn=f"urn:OCSASim:ControllableCounter:{self.name}",
+            parent_node=self.node,
+        )
         self.node.add_system(self.system, True)
 
         self.datastream = self.system.add_insert_datastream(self.ds_schema)
@@ -150,8 +193,6 @@ class ControllableCounterSim(Sim):
         cmd_dict = json.loads(command)
         params = cmd_dict.get("parameters")
 
-
-
         cd_old = copy.copy(self.count_down)
         step_old = copy.copy(self.step)
         lb_old = copy.copy(self.lower_bound)
@@ -159,25 +200,22 @@ class ControllableCounterSim(Sim):
 
         did_update = False
 
-        if "setCountDown" in params:
-            if params["setCountDown"] != cd_old:
-                self.count_down = params["setCountDown"]
-                self.step_sign = -1 if self.count_down else 1
-                did_update = True
+        if "setCountDown" in params and params["setCountDown"] != cd_old:
+            self.count_down = params["setCountDown"]
+            self.step_sign = -1 if self.count_down else 1
+            did_update = True
 
-        if "setStep" in params:
-            if params["setStep"] != step_old:
-                self.step = params["setStep"]
-                did_update = True
+        if "setStep" in params and params["setStep"] != step_old:
+            self.step = params["setStep"]
+            did_update = True
 
-        if "setLowerBound" in params:
-            if params["setLowerBound"] != lb_old:
-                self.lower_bound = params["setLowerBound"]
-                did_update = True
-        if "setUpperBound" in params:
-            if params["setUpperBound"] != ub_old:
-                self.upper_bound = params["setUpperBound"]
-                did_update = True
+        if "setLowerBound" in params and params["setLowerBound"] != lb_old:
+            self.lower_bound = params["setLowerBound"]
+            did_update = True
+
+        if "setUpperBound" in params and params["setUpperBound"] != ub_old:
+            self.upper_bound = params["setUpperBound"]
+            did_update = True
 
         if did_update:
             print(f"UPDATED COUNTSIM COMMAND: {command}")
@@ -199,8 +237,8 @@ class ControllableCounterSim(Sim):
                 "countDown": self.count_down,
                 "step": self.step,
                 "lowerBound": self.lower_bound,
-                "upperBound": self.upper_bound
-            }
+                "upperBound": self.upper_bound,
+            },
         }
 
         return obs

@@ -4,21 +4,25 @@ import math
 import random
 import time
 
-logger = logging.getLogger(__name__)
-
-from oshconnect import OSHConnect, Node, System
+from oshconnect import Node, OSHConnect, System
 from oshconnect.api_utils import URI, UCUMCode
 from oshconnect.swe_components import (
-    DataRecordSchema, TimeSchema, QuantitySchema, CountSchema, BooleanSchema,
+    BooleanSchema,
+    CountSchema,
+    DataRecordSchema,
+    QuantitySchema,
+    TimeSchema,
 )
 from oshconnect.timemanagement import TimeInstant
 
 from sims.sim import Sim
 
+logger = logging.getLogger(__name__)
+
 
 def _to_camel(s: str) -> str:
-    parts = s.replace('-', '_').replace(' ', '_').split('_')
-    return parts[0].lower() + ''.join(p.title() for p in parts[1:])
+    parts = s.replace("-", "_").replace(" ", "_").split("_")
+    return parts[0].lower() + "".join(p.title() for p in parts[1:])
 
 
 # Behaviors available per field type (used by the builder UI and validated here)
@@ -154,11 +158,14 @@ class CustomSim(Sim):
             definition="http://bottsinc.com/def/CustomSim",
             fields=[],
         )
-        schema.fields.append(TimeSchema(
-            label="Timestamp", name="timestamp",
-            definition="http://www.opengis.net/def/property/OGC/0/SamplingTime",
-            uom=URI(href="http://www.opengis.net/def/uom/ISO-8601/0/Gregorian"),
-        ))
+        schema.fields.append(
+            TimeSchema(
+                label="Timestamp",
+                name="timestamp",
+                definition="http://www.opengis.net/def/property/OGC/0/SamplingTime",
+                uom=URI(href="http://www.opengis.net/def/uom/ISO-8601/0/Gregorian"),
+            )
+        )
         for f in self.spec.get("fields", []):
             ft = f["type"]
             fn = f["name"]
@@ -166,10 +173,14 @@ class CustomSim(Sim):
             defn = f.get("definition", f"http://bottsinc.com/def/custom/{fn}")
             if ft == "Quantity":
                 unit = f.get("unit", "1")
-                schema.fields.append(QuantitySchema(
-                    label=fl, name=fn, definition=defn,
-                    uom=UCUMCode(code=unit, label=unit),
-                ))
+                schema.fields.append(
+                    QuantitySchema(
+                        label=fl,
+                        name=fn,
+                        definition=defn,
+                        uom=UCUMCode(code=unit, label=unit),
+                    )
+                )
             elif ft == "Count":
                 schema.fields.append(CountSchema(label=fl, name=fn, definition=defn))
             elif ft == "Boolean":

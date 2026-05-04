@@ -1,3 +1,5 @@
+import contextlib
+
 from oshconnect.csapi4py.constants import APIResourceTypes
 
 # Flat dict keyed by "{node_id}:{sim_name}"
@@ -15,11 +17,7 @@ def get(node_id: str, name: str):
 def list_for_node(node_id: str) -> dict:
     """Return {sim_name: sim_dict} for all sims belonging to *node_id*."""
     prefix = f"{node_id}:"
-    return {
-        k[len(prefix):]: _sim_to_dict(v)
-        for k, v in _sims.items()
-        if k.startswith(prefix)
-    }
+    return {k[len(prefix) :]: _sim_to_dict(v) for k, v in _sims.items() if k.startswith(prefix)}
 
 
 def remove_for_node(node_id: str):
@@ -47,32 +45,25 @@ def _sim_topics(sim) -> dict:
     topics = {}
     ds = getattr(sim, "datastream", None)
     if ds is not None:
-        try:
+        with contextlib.suppress(Exception):
             topics["observations"] = ds.get_mqtt_topic(
-                subresource=APIResourceTypes.OBSERVATION, data_topic=True)
-        except Exception:
-            pass
-        try:
+                subresource=APIResourceTypes.OBSERVATION, data_topic=True
+            )
+        with contextlib.suppress(Exception):
             topics["datastream_events"] = ds.get_event_topic()
-        except Exception:
-            pass
 
     cs = getattr(sim, "controlstream", None)
     if cs is not None:
-        try:
+        with contextlib.suppress(Exception):
             topics["commands"] = cs.get_mqtt_topic(
-                subresource=APIResourceTypes.COMMAND, data_topic=True)
-        except Exception:
-            pass
-        try:
+                subresource=APIResourceTypes.COMMAND, data_topic=True
+            )
+        with contextlib.suppress(Exception):
             topics["control_status"] = cs.get_mqtt_topic(
-                subresource=APIResourceTypes.STATUS, data_topic=True)
-        except Exception:
-            pass
-        try:
+                subresource=APIResourceTypes.STATUS, data_topic=True
+            )
+        with contextlib.suppress(Exception):
             topics["controlstream_events"] = cs.get_event_topic()
-        except Exception:
-            pass
     return topics
 
 
@@ -87,7 +78,9 @@ def _sim_to_dict(sim) -> dict:
     if hasattr(sim, "spec"):
         d["params"] = {"interval": sim.spec.get("interval", 5)}
     else:
-        d["params"] = {k: getattr(sim, k) for k in
-                       ("count", "step", "lower_bound", "upper_bound", "count_down")
-                       if hasattr(sim, k)}
+        d["params"] = {
+            k: getattr(sim, k)
+            for k in ("count", "step", "lower_bound", "upper_bound", "count_down")
+            if hasattr(sim, k)
+        }
     return d

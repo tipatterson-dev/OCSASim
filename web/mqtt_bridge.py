@@ -1,9 +1,9 @@
 import asyncio
+import contextlib
 import logging
 import threading
 
 import paho.mqtt.client as mqtt
-
 from oshconnect import Node
 from oshconnect.csapi4py.mqtt import MQTTCommClient
 
@@ -18,10 +18,8 @@ _paho_original_del = mqtt.Client.__del__
 
 
 def _paho_safe_del(self):
-    try:
+    with contextlib.suppress(AttributeError):
         _paho_original_del(self)
-    except AttributeError:
-        pass
 
 
 mqtt.Client.__del__ = _paho_safe_del
@@ -48,10 +46,11 @@ class MQTTBridge:
         self._loop: asyncio.AbstractEventLoop | None = None
         self._queue: asyncio.Queue | None = None
         self._clients: set = set()
-        self._monitors: dict[str, MQTTCommClient] = {}    # node_id -> oshconnect MQTT client
-        self._subscriptions: dict[str, set[str]] = {}     # node_id -> {topics}
+        self._monitors: dict[str, MQTTCommClient] = {}  # node_id -> oshconnect MQTT client
+        self._subscriptions: dict[str, set[str]] = {}  # node_id -> {topics}
         self._lock = threading.Lock()
-        self._hooks: dict[str, callable] = {}             # node_id -> callback(node_id, topic, payload)
+        self._hooks: dict[str, callable] = {}  # node_id -> callback(node_id, topic, payload)
+        self._broadcast_task: asyncio.Task | None = None
 
     def attach_loop(self, loop: asyncio.AbstractEventLoop):
         self._loop = loop
@@ -80,7 +79,8 @@ class MQTTBridge:
         # messages on the shared client.
         # Bind node_id via closure since paho's callback signature has no per-call userdata.
         mqtt_client.subscribe(
-            "#", qos=0,
+            "#",
+            qos=0,
             msg_callback=lambda c, u, msg: self._on_global_message(node_id, msg),
         )
         with self._lock:
